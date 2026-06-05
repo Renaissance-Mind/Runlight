@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicoritschel/tauri-app/master/tooling/cli/schema.json",
+  "productName": "AgentMonitor",
+  "version": "0.1.0",
+  "identifier": "com.agentmonitor.dashboard",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AgentMonitor",
+        "width": 1100,
+        "height": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}
