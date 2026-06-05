@@ -7,8 +7,16 @@
 trap 'exit 0' ERR EXIT
 set +e +u
 
-AGENT_MONITOR_SERVER_URL="${AGENT_MONITOR_SERVER_URL:-http://127.0.0.1:8766}"
-AGENT_MONITOR_TOKEN="${AGENT_MONITOR_TOKEN:-}"
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+SETTINGS_FILE="${HOOK_DIR}/settings.json"
+
+if [ -f "$SETTINGS_FILE" ] && command -v jq &>/dev/null; then
+  _cfg_url="$(jq -r '.server_url // empty' "$SETTINGS_FILE" 2>/dev/null)"
+  _cfg_token="$(jq -r '.token // empty' "$SETTINGS_FILE" 2>/dev/null)"
+fi
+
+AGENT_MONITOR_SERVER_URL="${AGENT_MONITOR_SERVER_URL:-${_cfg_url:-http://127.0.0.1:8766}}"
+AGENT_MONITOR_TOKEN="${AGENT_MONITOR_TOKEN:-${_cfg_token:-}}"
 
 _STDIN="$(cat)"
 
