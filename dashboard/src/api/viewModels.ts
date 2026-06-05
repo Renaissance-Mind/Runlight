@@ -6,6 +6,16 @@ export interface SessionSurfaceInput {
   session_id: string;
 }
 
+export interface ProjectSessionInput {
+  workspace_project_name: string | null;
+  workspace_cwd: string | null;
+}
+
+export interface ProjectSessionGroup<T extends ProjectSessionInput> {
+  projectName: string;
+  sessions: T[];
+}
+
 export interface SessionSurfaceCounts {
   running: number;
   finished: number;
@@ -28,6 +38,40 @@ export interface SessionSurfaceSummary {
 
 export function getSessionSurfaceLabel(session: SessionSurfaceInput): string {
   return session.session_name || session.summary || session.session_id;
+}
+
+export function getSessionProjectName(session: ProjectSessionInput): string {
+  const explicitName = session.workspace_project_name?.trim();
+  if (explicitName && explicitName !== "." && explicitName !== "/") {
+    return explicitName;
+  }
+
+  const cwd = session.workspace_cwd?.trim();
+  if (!cwd) return "Unknown project";
+
+  const parts = cwd.split("/").filter(Boolean);
+  return parts[parts.length - 1] || "Unknown project";
+}
+
+export function groupSessionsByProject<T extends ProjectSessionInput>(
+  sessions: T[],
+): ProjectSessionGroup<T>[] {
+  const groups = new Map<string, T[]>();
+
+  for (const session of sessions) {
+    const projectName = getSessionProjectName(session);
+    const group = groups.get(projectName);
+    if (group) {
+      group.push(session);
+    } else {
+      groups.set(projectName, [session]);
+    }
+  }
+
+  return Array.from(groups, ([projectName, groupSessions]) => ({
+    projectName,
+    sessions: groupSessions,
+  }));
 }
 
 export function summarizeSessionsForSurface(
