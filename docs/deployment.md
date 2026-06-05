@@ -117,10 +117,10 @@ For the installed Codex plugin, edit:
 
 ## Configure Dashboard
 
-Open the dashboard and use the top connection controls:
+Open the dashboard settings page:
 
 ```text
-http://127.0.0.1:3000
+http://127.0.0.1:3000/settings
 ```
 
 Save the server URL and token. The dashboard stores that runtime connection in
