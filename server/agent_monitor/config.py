@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = {"env_prefix": "AGENT_MONITOR_"}
 
     server_host: str = "127.0.0.1"
-    server_port: int = 8765
+    server_port: int = 8766
     database_url: str = "sqlite+aiosqlite:///agent_monitor.db"
     token_map: str = ""
     heartbeat_stale_seconds: int = 120

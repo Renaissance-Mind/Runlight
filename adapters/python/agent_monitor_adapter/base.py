@@ -84,7 +84,7 @@ class AgentMonitorClient:
     ):
         self.server_url = (
             server_url
-            or os.environ.get("AGENT_MONITOR_SERVER_URL", "http://127.0.0.1:8765")
+            or os.environ.get("AGENT_MONITOR_SERVER_URL", "http://127.0.0.1:8766")
         ).rstrip("/")
         self.token = token or os.environ.get("AGENT_MONITOR_TOKEN")
         self.agent_type = agent_type

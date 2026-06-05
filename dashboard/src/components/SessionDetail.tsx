@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import type { Session, SessionEvent } from "../types/session";
 import { fetchSession, fetchSessionEvents } from "../api/client";
 import StatusBadge from "./StatusBadge";
+import type { DashboardConnectionConfig } from "../api/config";
 
 function formatTime(isoStr: string | null): string {
   if (!isoStr) return "-";
@@ -16,7 +17,11 @@ const SEVERITY_COLORS: Record<string, string> = {
   error: "text-accent-red",
 };
 
-export default function SessionDetail() {
+export default function SessionDetail({
+  config,
+}: {
+  config: DashboardConnectionConfig;
+}) {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [session, setSession] = useState<Session | null>(null);
   const [events, setEvents] = useState<SessionEvent[]>([]);
@@ -24,7 +29,10 @@ export default function SessionDetail() {
 
   useEffect(() => {
     if (!sessionId) return;
-    Promise.all([fetchSession(sessionId), fetchSessionEvents(sessionId)])
+    Promise.all([
+      fetchSession(sessionId, config),
+      fetchSessionEvents(sessionId, config),
+    ])
       .then(([s, evts]) => {
         setSession(s);
         setEvents(evts);
@@ -34,8 +42,8 @@ export default function SessionDetail() {
     const interval = setInterval(async () => {
       try {
         const [s, evts] = await Promise.all([
-          fetchSession(sessionId),
-          fetchSessionEvents(sessionId),
+          fetchSession(sessionId, config),
+          fetchSessionEvents(sessionId, config),
         ]);
         setSession(s);
         setEvents(evts);
@@ -45,7 +53,7 @@ export default function SessionDetail() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [sessionId]);
+  }, [sessionId, config]);
 
   if (loading) {
     return <div className="p-4 text-gray-500 animate-pulse">Loading...</div>;

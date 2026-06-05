@@ -1,11 +1,64 @@
+import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import { useLiveSessions } from "./hooks/useSessions";
 import SessionsTable from "./components/SessionsTable";
 import SessionDetail from "./components/SessionDetail";
 import FloatingHUD from "./components/FloatingHUD";
+import {
+  readStoredDashboardConfig,
+  resolveDashboardConfig,
+  writeStoredDashboardConfig,
+  type DashboardConnectionConfig,
+} from "./api/config";
 
-function Dashboard() {
-  const { sessions, loading, error, refresh } = useLiveSessions(3000);
+function ConnectionControls({
+  config,
+  onChange,
+}: {
+  config: DashboardConnectionConfig;
+  onChange: (config: DashboardConnectionConfig) => void;
+}) {
+  const [draft, setDraft] = useState(config);
+
+  const save = () => {
+    const next = resolveDashboardConfig(undefined, draft);
+    writeStoredDashboardConfig(next);
+    setDraft(next);
+    onChange(next);
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <input
+        aria-label="Server URL"
+        value={draft.serverUrl}
+        onChange={(event) =>
+          setDraft({ ...draft, serverUrl: event.currentTarget.value })
+        }
+        className="w-64 bg-surface-1 border border-surface-3 rounded px-2 py-1 text-gray-300"
+      />
+      <input
+        aria-label="Token"
+        value={draft.token}
+        onChange={(event) =>
+          setDraft({ ...draft, token: event.currentTarget.value })
+        }
+        placeholder="token"
+        type="password"
+        className="w-32 bg-surface-1 border border-surface-3 rounded px-2 py-1 text-gray-300"
+      />
+      <button
+        onClick={save}
+        className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
+      >
+        Save
+      </button>
+    </div>
+  );
+}
+
+function Dashboard({ config }: { config: DashboardConnectionConfig }) {
+  const { sessions, loading, error, refresh } = useLiveSessions(config, 3000);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -43,14 +96,26 @@ function Dashboard() {
 }
 
 export default function App() {
+  const [config, setConfig] = useState(() =>
+    resolveDashboardConfig(undefined, readStoredDashboardConfig()),
+  );
+
   return (
-    <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/sessions/:sessionId" element={
-        <div className="min-h-screen p-4">
-          <SessionDetail />
-        </div>
-      } />
-    </Routes>
+    <>
+      <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-end">
+        <ConnectionControls config={config} onChange={setConfig} />
+      </header>
+      <Routes>
+        <Route path="/" element={<Dashboard config={config} />} />
+        <Route
+          path="/sessions/:sessionId"
+          element={
+            <div className="min-h-screen p-4">
+              <SessionDetail config={config} />
+            </div>
+          }
+        />
+      </Routes>
+    </>
   );
 }

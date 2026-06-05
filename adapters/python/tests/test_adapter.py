@@ -12,7 +12,7 @@ from agent_monitor_adapter.claude_code import ClaudeCodeAdapter
 class TestBaseClient:
     def test_init_defaults(self):
         client = AgentMonitorClient()
-        assert client.server_url == "http://127.0.0.1:8765"
+        assert client.server_url == "http://127.0.0.1:8766"
         assert client.agent_type == "generic"
         assert client.adapter_name == "python-adapter"
 

@@ -411,7 +411,7 @@ Important configuration:
 Example local shape:
 
 ```text
-AGENT_MONITOR_SERVER_URL=http://127.0.0.1:8765
+AGENT_MONITOR_SERVER_URL=http://127.0.0.1:8766
 AGENT_MONITOR_TOKEN=
 AGENT_MONITOR_DATABASE_URL=sqlite:///agent_monitor.db
 ```

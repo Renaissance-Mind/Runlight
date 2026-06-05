@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "../types/session";
 import { fetchLiveSessions, fetchAllSessions } from "../api/client";
+import type { DashboardConnectionConfig } from "../api/config";
 
-export function useLiveSessions(intervalMs = 3000) {
+export function useLiveSessions(
+  config: DashboardConnectionConfig,
+  intervalMs = 3000,
+) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -10,7 +14,7 @@ export function useLiveSessions(intervalMs = 3000) {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await fetchLiveSessions();
+      const data = await fetchLiveSessions(config);
       setSessions(data);
       setError(null);
     } catch (e) {
@@ -18,7 +22,7 @@ export function useLiveSessions(intervalMs = 3000) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [config]);
 
   useEffect(() => {
     refresh();
@@ -32,6 +36,7 @@ export function useLiveSessions(intervalMs = 3000) {
 export function useAllSessions(params?: {
   agent_type?: string;
   status?: string;
+  config: DashboardConnectionConfig;
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +46,7 @@ export function useAllSessions(params?: {
     fetchAllSessions(params)
       .then(setSessions)
       .finally(() => setLoading(false));
-  }, [params?.agent_type, params?.status]);
+  }, [params?.agent_type, params?.status, params?.config]);
 
   return { sessions, loading };
 }
