@@ -33,9 +33,11 @@ Thumbs.db
 # Node
 node_modules/
 npm-debug.log*
+dashboard/tsconfig.tsbuildinfo
 
 # Tauri
 dashboard/src-tauri/target/
+dashboard/src-tauri/gen/
 
 # Env
 .env

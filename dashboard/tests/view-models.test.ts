@@ -26,7 +26,7 @@ describe("pet-ready session view models", () => {
         session_id: "s2",
       },
       {
-        current_status: "finished",
+        current_status: "completed",
         latest_event_type: "message.finished",
         session_name: "Done turn",
         summary: null,

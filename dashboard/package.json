@@ -6,16 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "npm run test:api-config && npm run test:client && npm run test:view-models && npm run test:pet-surface && npm run test:settings-model",
+    "test": "npm run test:api-config && npm run test:client && npm run test:view-models && npm run test:pet-surface && npm run test:pet-sprite-state && npm run test:pet-assets && npm run test:settings-model",
     "test:api-config": "node --test --experimental-strip-types tests/api-config.test.ts",
     "test:client": "node --test --experimental-strip-types tests/client.test.ts",
+    "test:pet-assets": "node --test --experimental-strip-types tests/pet-assets.test.ts",
     "test:pet-surface": "node --test --experimental-strip-types tests/pet-surface.test.ts",
+    "test:pet-sprite-state": "node --test --experimental-strip-types tests/pet-sprite-state.test.ts",
     "test:settings-model": "node --test --experimental-strip-types tests/settings-model.test.ts",
     "test:view-models": "node --test --experimental-strip-types tests/view-models.test.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2"

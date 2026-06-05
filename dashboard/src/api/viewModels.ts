@@ -134,6 +134,7 @@ export function summarizeSessionsForSurface(
         counts.running++;
         break;
       case "finished":
+      case "completed":
         counts.finished++;
         break;
       case "stale":
