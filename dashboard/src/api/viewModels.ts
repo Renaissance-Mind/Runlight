@@ -1,0 +1,76 @@
+export interface SessionSurfaceInput {
+  current_status: string;
+  latest_event_type: string | null;
+  session_name: string | null;
+  summary: string | null;
+  session_id: string;
+}
+
+export interface SessionSurfaceCounts {
+  running: number;
+  stale: number;
+  failed: number;
+  waiting: number;
+}
+
+export interface LatestSessionSurface {
+  sessionId: string;
+  label: string;
+  eventType: string | null;
+  status: string;
+}
+
+export interface SessionSurfaceSummary {
+  counts: SessionSurfaceCounts;
+  latest: LatestSessionSurface | null;
+}
+
+export function getSessionSurfaceLabel(session: SessionSurfaceInput): string {
+  return session.session_name || session.summary || session.session_id;
+}
+
+export function summarizeSessionsForSurface(
+  sessions: SessionSurfaceInput[],
+): SessionSurfaceSummary {
+  const counts: SessionSurfaceCounts = {
+    running: 0,
+    stale: 0,
+    failed: 0,
+    waiting: 0,
+  };
+
+  for (const session of sessions) {
+    switch (session.current_status) {
+      case "running":
+      case "tool_running":
+      case "command_running":
+      case "starting":
+        counts.running++;
+        break;
+      case "stale":
+        counts.stale++;
+        break;
+      case "failed":
+      case "aborted":
+        counts.failed++;
+        break;
+      case "waiting_user":
+      case "waiting_external":
+        counts.waiting++;
+        break;
+    }
+  }
+
+  const latestSession = sessions[0] ?? null;
+  return {
+    counts,
+    latest: latestSession
+      ? {
+          sessionId: latestSession.session_id,
+          label: getSessionSurfaceLabel(latestSession),
+          eventType: latestSession.latest_event_type,
+          status: latestSession.current_status,
+        }
+      : null,
+  };
+}

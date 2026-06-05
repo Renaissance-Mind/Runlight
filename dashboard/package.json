@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "npm run test:api-config && npm run test:client",
+    "test": "npm run test:api-config && npm run test:client && npm run test:view-models",
     "test:api-config": "node --test --experimental-strip-types tests/api-config.test.ts",
     "test:client": "node --test --experimental-strip-types tests/client.test.ts",
+    "test:view-models": "node --test --experimental-strip-types tests/view-models.test.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },
