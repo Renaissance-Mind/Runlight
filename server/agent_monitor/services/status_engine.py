@@ -12,11 +12,18 @@ from agent_monitor.config import settings
 from agent_monitor.protocol import TERMINAL_EVENT_TYPES
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def infer_status(
     latest_event_type: str | None,
     last_heartbeat_at: datetime | None,
     active_started_types: list[str] | None = None,
     terminal_result: str | None = None,
+    last_event_at: datetime | None = None,
 ) -> str:
     if terminal_result:
         return terminal_result
@@ -36,8 +43,12 @@ def infer_status(
     if latest_event_type == "permission.requested":
         return "waiting_user"
 
-    if last_heartbeat_at:
-        age = (datetime.now(timezone.utc) - last_heartbeat_at).total_seconds()
+    if latest_event_type == "message.finished":
+        return "finished"
+
+    stale_reference = last_heartbeat_at or last_event_at
+    if stale_reference:
+        age = (datetime.now(timezone.utc) - _as_utc(stale_reference)).total_seconds()
         if age > settings.heartbeat_stale_seconds:
             return "stale"
 
@@ -49,9 +60,6 @@ def infer_status(
 
     if latest_event_type == "session.started" and last_heartbeat_at is None:
         return "starting"
-
-    if latest_event_type == "message.finished":
-        return "finished"
 
     if latest_event_type and latest_event_type != "session.started":
         return "running"

@@ -15,13 +15,16 @@ from agent_monitor.services.session_service import (
     get_all_sessions,
     get_live_sessions,
     get_session_by_id,
+    refresh_session_statuses,
 )
 
 router = APIRouter(prefix="/api", tags=["sessions"])
 
 
 async def _sync_codex_pins(db: AsyncSession, user_id: str) -> None:
-    if await sync_codex_pinned_sessions(db, user_id):
+    changed = await sync_codex_pinned_sessions(db, user_id)
+    changed = await refresh_session_statuses(db, user_id) or changed
+    if changed:
         await db.commit()
 
 

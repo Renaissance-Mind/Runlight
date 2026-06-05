@@ -2,8 +2,10 @@
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+from agent_monitor.db.models import Session
+from agent_monitor.services.session_service import refresh_session_statuses
 
 def _make_event(**overrides) -> dict:
     base = {
@@ -183,6 +185,31 @@ class TestSessionQueries:
         assert "sess-live-1" in ids
         assert "sess-live-2" in ids
         assert "sess-done" not in ids
+
+    async def test_refresh_session_statuses_marks_old_hook_activity_stale(
+        self, db_session
+    ):
+        old = datetime.now(timezone.utc) - timedelta(seconds=300)
+        db_session.add(
+            Session(
+                session_id="sess-stuck-running",
+                user_id="default",
+                agent_type="codex",
+                adapter_name="codex-hook",
+                current_status="running",
+                latest_event_type="tool.started",
+                started_at=old,
+                last_event_at=old,
+                event_count=1,
+            )
+        )
+        await db_session.commit()
+
+        changed = await refresh_session_statuses(db_session, "default")
+
+        assert changed is True
+        session = await db_session.get(Session, 1)
+        assert session.current_status == "stale"
 
     async def test_finished_turn_stays_live(self, client):
         await client.post("/api/events", json=_make_event(session_id="sess-finished"))

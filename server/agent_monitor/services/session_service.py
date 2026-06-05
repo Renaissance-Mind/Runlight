@@ -77,9 +77,32 @@ async def upsert_session(db: AsyncSession, envelope: EventEnvelope, user_id: str
         latest_event_type=session.latest_event_type,
         last_heartbeat_at=session.last_heartbeat_at,
         terminal_result=session.terminal_result,
+        last_event_at=session.last_event_at,
     )
 
     return session
+
+
+async def refresh_session_statuses(db: AsyncSession, user_id: str) -> bool:
+    terminal = {"completed", "failed", "aborted"}
+    result = await db.execute(
+        select(Session)
+        .where(Session.user_id == user_id)
+        .where(Session.current_status.notin_(terminal))
+    )
+
+    changed = False
+    for session in result.scalars().all():
+        next_status = infer_status(
+            latest_event_type=session.latest_event_type,
+            last_heartbeat_at=session.last_heartbeat_at,
+            terminal_result=session.terminal_result,
+            last_event_at=session.last_event_at,
+        )
+        if session.current_status != next_status:
+            session.current_status = next_status
+            changed = True
+    return changed
 
 
 async def get_live_sessions(db: AsyncSession, user_id: str) -> list[Session]:

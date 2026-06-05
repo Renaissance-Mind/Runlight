@@ -20,6 +20,14 @@ class TestStatusEngine:
         old = datetime.now(timezone.utc) - timedelta(seconds=300)
         assert infer_status("session.heartbeat", old) == "stale"
 
+    def test_stale_without_heartbeat_uses_last_event_time(self):
+        old = datetime.now(timezone.utc) - timedelta(seconds=300)
+        assert infer_status("tool.started", None, last_event_at=old) == "stale"
+
+    def test_finished_without_heartbeat_does_not_become_stale(self):
+        old = datetime.now(timezone.utc) - timedelta(seconds=300)
+        assert infer_status("message.finished", None, last_event_at=old) == "finished"
+
     def test_waiting_user(self):
         assert infer_status("user_input.waiting", None) == "waiting_user"
 
