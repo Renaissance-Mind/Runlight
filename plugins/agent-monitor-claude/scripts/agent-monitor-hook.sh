@@ -7,6 +7,18 @@ _trim() {
   printf "%s" "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
+# Read config from ~/.claude/settings.json pluginConfigs (env vars override)
+if [ -z "${AGENT_MONITOR_SERVER_URL:-}" ] || [ -z "${AGENT_MONITOR_TOKEN:-}" ]; then
+  _SETTINGS="$HOME/.claude/settings.json"
+  if [ -f "$_SETTINGS" ] && command -v jq >/dev/null 2>&1; then
+    _PC='.pluginConfigs["agent-monitor@agent-monitor-local"].options'
+    [ -z "${AGENT_MONITOR_SERVER_URL:-}" ] && \
+      AGENT_MONITOR_SERVER_URL="$(jq -r "$_PC.server_url // empty" "$_SETTINGS" 2>/dev/null || echo "")"
+    [ -z "${AGENT_MONITOR_TOKEN:-}" ] && \
+      AGENT_MONITOR_TOKEN="$(jq -r "$_PC.token // empty" "$_SETTINGS" 2>/dev/null || echo "")"
+  fi
+fi
+
 AGENT_MONITOR_SERVER_URL="$(_trim "${AGENT_MONITOR_SERVER_URL:-http://127.0.0.1:8766}")"
 AGENT_MONITOR_SERVER_URL="$(printf "%s" "$AGENT_MONITOR_SERVER_URL" | sed 's#/*$##')"
 [ -z "$AGENT_MONITOR_SERVER_URL" ] && AGENT_MONITOR_SERVER_URL="http://127.0.0.1:8766"
