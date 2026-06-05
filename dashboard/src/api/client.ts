@@ -3,7 +3,8 @@ import {
   buildRequestHeaders,
   type DashboardConnectionConfig,
   resolveDashboardConfig,
-} from "./config";
+} from "./config.ts";
+import type { Session, SessionEvent } from "../types/session.ts";
 
 async function fetchJSON<T>(
   config: DashboardConnectionConfig,
@@ -23,9 +24,20 @@ async function fetchJSON<T>(
   return resp.json() as Promise<T>;
 }
 
-import type { Session, SessionEvent } from "../types/session";
-
 const defaultConfig = resolveDashboardConfig();
+
+export interface CurrentUser {
+  user_id: string;
+}
+
+export interface ServerConnectionProbe {
+  ok: boolean;
+  serverUrl: string;
+  userId: string | null;
+  tokenConfigured: boolean;
+  checkedAt: string;
+  error: string | null;
+}
 
 export async function fetchLiveSessions(
   config: DashboardConnectionConfig = defaultConfig,
@@ -74,6 +86,41 @@ export async function fetchSessionEvents(
 
 export async function fetchHealth(
   config: DashboardConnectionConfig = defaultConfig,
-): Promise<{ status: string }> {
-  return fetchJSON<{ status: string }>(config, "/health");
+): Promise<{ status: string; service?: string }> {
+  return fetchJSON<{ status: string; service?: string }>(config, "/health");
+}
+
+export async function fetchCurrentUser(
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<CurrentUser> {
+  return fetchJSON<CurrentUser>(config, "/users/current");
+}
+
+export async function probeServerConnection(
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<ServerConnectionProbe> {
+  const checkedAt = new Date().toISOString();
+  const tokenConfigured = config.token.trim().length > 0;
+
+  try {
+    await fetchHealth(config);
+    const user = await fetchCurrentUser(config);
+    return {
+      ok: true,
+      serverUrl: config.serverUrl,
+      userId: user.user_id,
+      tokenConfigured,
+      checkedAt,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      serverUrl: config.serverUrl,
+      userId: null,
+      tokenConfigured,
+      checkedAt,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }

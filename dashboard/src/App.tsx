@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import { useLiveSessions } from "./hooks/useSessions";
+import { useServerConnection } from "./hooks/useServerConnection";
 import SessionsTable from "./components/SessionsTable";
 import SessionDetail from "./components/SessionDetail";
 import FloatingHUD from "./components/FloatingHUD";
@@ -10,12 +11,15 @@ import {
   writeStoredDashboardConfig,
   type DashboardConnectionConfig,
 } from "./api/config";
+import type { ServerConnectionProbe } from "./api/client";
 
 function ConnectionControls({
   config,
+  probe,
   onChange,
 }: {
   config: DashboardConnectionConfig;
+  probe: ServerConnectionProbe | null;
   onChange: (config: DashboardConnectionConfig) => void;
 }) {
   const [draft, setDraft] = useState(config);
@@ -28,7 +32,8 @@ function ConnectionControls({
   };
 
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+      <ConnectionStatus probe={probe} />
       <input
         aria-label="Server URL"
         value={draft.serverUrl}
@@ -54,6 +59,26 @@ function ConnectionControls({
         Save
       </button>
     </div>
+  );
+}
+
+function ConnectionStatus({ probe }: { probe: ServerConnectionProbe | null }) {
+  if (!probe) {
+    return <span className="text-[10px] text-gray-600">Checking server</span>;
+  }
+
+  if (!probe.ok) {
+    return (
+      <span className="max-w-72 truncate text-[10px] text-accent-red">
+        Disconnected: {probe.error}
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-[10px] text-gray-500">
+      {probe.userId || "default"} / {probe.tokenConfigured ? "token" : "no token"}
+    </span>
   );
 }
 
@@ -99,11 +124,12 @@ export default function App() {
   const [config, setConfig] = useState(() =>
     resolveDashboardConfig(undefined, readStoredDashboardConfig()),
   );
+  const { probe } = useServerConnection(config, 10000);
 
   return (
     <>
       <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-end">
-        <ConnectionControls config={config} onChange={setConfig} />
+        <ConnectionControls config={config} probe={probe} onChange={setConfig} />
       </header>
       <Routes>
         <Route path="/" element={<Dashboard config={config} />} />
