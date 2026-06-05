@@ -183,6 +183,7 @@ Recommended derived statuses:
 
 - `starting`: session exists but has not produced a normal heartbeat or work event
 - `running`: recent heartbeat or active work event
+- `finished`: the latest agent response finished, but the session is not terminal
 - `tool_running`: latest active unit is a tool
 - `command_running`: latest active unit is a command
 - `waiting_user`: latest significant event asks for user input

@@ -197,7 +197,7 @@ case "$HOOK_EVENT" in
     ;;
 
   Stop)
-    _send_event "session.completed" "Codex session completed" "info" null
+    _send_event "message.finished" "Codex response finished" "info" null
     ;;
 esac
 

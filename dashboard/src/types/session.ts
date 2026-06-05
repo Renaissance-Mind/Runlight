@@ -40,6 +40,7 @@ export interface SessionEvent {
 export type SessionStatus =
   | "starting"
   | "running"
+  | "finished"
   | "tool_running"
   | "command_running"
   | "waiting_user"

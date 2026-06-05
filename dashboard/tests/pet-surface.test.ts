@@ -31,6 +31,7 @@ describe("pet surface snapshot", () => {
       attentionLevel: "medium",
       counts: {
         running: 1,
+        finished: 0,
         stale: 0,
         failed: 0,
         waiting: 1,

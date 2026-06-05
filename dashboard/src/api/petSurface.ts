@@ -25,6 +25,7 @@ function moodFromCounts(counts: SessionSurfaceCounts): {
   if (counts.waiting > 0) return { mood: "waiting", attentionLevel: "medium" };
   if (counts.stale > 0) return { mood: "offline", attentionLevel: "medium" };
   if (counts.running > 0) return { mood: "working", attentionLevel: "low" };
+  if (counts.finished > 0) return { mood: "idle", attentionLevel: "low" };
   return { mood: "idle", attentionLevel: "none" };
 }
 

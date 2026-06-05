@@ -8,6 +8,7 @@ export interface SessionSurfaceInput {
 
 export interface SessionSurfaceCounts {
   running: number;
+  finished: number;
   stale: number;
   failed: number;
   waiting: number;
@@ -34,6 +35,7 @@ export function summarizeSessionsForSurface(
 ): SessionSurfaceSummary {
   const counts: SessionSurfaceCounts = {
     running: 0,
+    finished: 0,
     stale: 0,
     failed: 0,
     waiting: 0,
@@ -46,6 +48,9 @@ export function summarizeSessionsForSurface(
       case "command_running":
       case "starting":
         counts.running++;
+        break;
+      case "finished":
+        counts.finished++;
         break;
       case "stale":
         counts.stale++;

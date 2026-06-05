@@ -156,7 +156,7 @@ case "$HOOK_EVENT" in
     ;;
 
   Stop)
-    _send_event "session.completed" "Claude Code session stopped" "info" null
+    _send_event "message.finished" "Claude Code response finished" "info" null
     ;;
 esac
 

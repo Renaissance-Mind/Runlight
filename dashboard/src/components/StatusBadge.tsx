@@ -6,6 +6,7 @@ interface Props {
 const STATUS_CONFIG: Record<string, { color: string; label: string; pulse?: boolean }> = {
   starting: { color: "bg-accent-blue", label: "Starting", pulse: true },
   running: { color: "bg-accent-green", label: "Running", pulse: true },
+  finished: { color: "bg-gray-500", label: "Finished" },
   tool_running: { color: "bg-accent-green", label: "Tool", pulse: true },
   command_running: { color: "bg-accent-green", label: "Cmd", pulse: true },
   waiting_user: { color: "bg-accent-yellow", label: "Waiting", pulse: true },

@@ -20,10 +20,18 @@ describe("pet-ready session view models", () => {
         summary: "Needs approval",
         session_id: "s2",
       },
+      {
+        current_status: "finished",
+        latest_event_type: "message.finished",
+        session_name: "Done turn",
+        summary: null,
+        session_id: "s3",
+      },
     ]);
 
     assert.deepEqual(summary.counts, {
       running: 1,
+      finished: 1,
       stale: 0,
       failed: 0,
       waiting: 1,

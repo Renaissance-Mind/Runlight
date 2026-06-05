@@ -29,6 +29,18 @@ class TestSessionQueries:
         assert "sess-live-2" in ids
         assert "sess-done" not in ids
 
+    async def test_finished_turn_stays_live(self, client):
+        await client.post("/api/events", json=_make_event(session_id="sess-finished"))
+        await client.post("/api/events", json=_make_event(
+            session_id="sess-finished", event_type="message.finished"
+        ))
+        resp = await client.get("/api/sessions/live")
+        assert resp.status_code == 200
+        session = next(
+            s for s in resp.json()["sessions"] if s["session_id"] == "sess-finished"
+        )
+        assert session["current_status"] == "finished"
+
     async def test_list_all_sessions(self, client):
         await client.post("/api/events", json=_make_event(session_id="sess-all-1"))
         await client.post("/api/events", json=_make_event(

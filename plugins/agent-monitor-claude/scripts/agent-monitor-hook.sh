@@ -135,7 +135,7 @@ case "$HOOK_EVENT" in
       "$(jq -n --arg r "$(_jq '.reason')" '{reason: $r}')"
     ;;
   Stop)
-    _send_event "session.completed" "Claude Code session stopped" "info" null
+    _send_event "message.finished" "Claude Code response finished" "info" null
     ;;
 esac
 

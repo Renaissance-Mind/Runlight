@@ -13,8 +13,8 @@ class TestStatusEngine:
         recent = datetime.now(timezone.utc) - timedelta(seconds=10)
         assert infer_status("session.heartbeat", recent) == "running"
 
-    def test_running_with_work_event(self):
-        assert infer_status("message.finished", None) == "running"
+    def test_finished_after_message(self):
+        assert infer_status("message.finished", None) == "finished"
 
     def test_stale_heartbeat(self):
         old = datetime.now(timezone.utc) - timedelta(seconds=300)

@@ -50,6 +50,9 @@ def infer_status(
     if latest_event_type == "session.started" and last_heartbeat_at is None:
         return "starting"
 
+    if latest_event_type == "message.finished":
+        return "finished"
+
     if latest_event_type and latest_event_type != "session.started":
         return "running"
 
