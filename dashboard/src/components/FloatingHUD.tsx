@@ -12,7 +12,7 @@ export default function FloatingHUD({ sessions }: Props) {
     <div className="bg-surface-2 border border-surface-3 rounded-lg px-4 py-3 shadow-xl">
       <div className="flex items-center gap-4 text-xs">
         <HUDCounter label="Running" count={surface.counts.running} color="text-accent-green" />
-        <HUDCounter label="Finished" count={surface.counts.finished} color="text-gray-400" />
+        <HUDCounter label="Finished" count={surface.counts.finished} color="text-accent-blue" />
         <HUDCounter label="Stale" count={surface.counts.stale} color="text-accent-yellow" />
         <HUDCounter label="Failed" count={surface.counts.failed} color="text-accent-red" />
         <HUDCounter label="Waiting" count={surface.counts.waiting} color="text-accent-orange" />
