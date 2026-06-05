@@ -1,5 +1,7 @@
 """Tests for session query endpoints."""
 
+import json
+import sqlite3
 from datetime import datetime, timezone
 
 
@@ -15,7 +17,160 @@ def _make_event(**overrides) -> dict:
     return base
 
 
+def _write_codex_state(tmp_path, monkeypatch, pinned_ids, rows):
+    global_state = tmp_path / ".codex-global-state.json"
+    state_db = tmp_path / "state_5.sqlite"
+    session_index = tmp_path / "session_index.jsonl"
+
+    global_state.write_text(json.dumps({"pinned-thread-ids": pinned_ids}))
+    session_index.write_text("")
+
+    conn = sqlite3.connect(state_db)
+    conn.execute(
+        """
+        CREATE TABLE threads (
+            id TEXT PRIMARY KEY,
+            rollout_path TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            model_provider TEXT NOT NULL,
+            cwd TEXT NOT NULL,
+            title TEXT NOT NULL,
+            sandbox_policy TEXT NOT NULL,
+            approval_mode TEXT NOT NULL,
+            git_sha TEXT,
+            git_branch TEXT,
+            archived INTEGER NOT NULL DEFAULT 0,
+            created_at_ms INTEGER,
+            updated_at_ms INTEGER
+        )
+        """
+    )
+    for row in rows:
+        conn.execute(
+            """
+            INSERT INTO threads (
+                id, rollout_path, created_at, updated_at, source, model_provider,
+                cwd, title, sandbox_policy, approval_mode, git_sha, git_branch,
+                archived, created_at_ms, updated_at_ms
+            ) VALUES (?, '', 1780000000, 1780000100, 'vscode', 'openai',
+                ?, ?, 'danger-full-access', 'never', ?, ?, 0,
+                1780000000000, 1780000100000)
+            """,
+            (
+                row["id"],
+                row["cwd"],
+                row["title"],
+                row.get("git_sha"),
+                row.get("git_branch"),
+            ),
+        )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setenv("AGENT_MONITOR_CODEX_GLOBAL_STATE", str(global_state))
+    monkeypatch.setenv("AGENT_MONITOR_CODEX_STATE_DB", str(state_db))
+    monkeypatch.setenv("AGENT_MONITOR_CODEX_SESSION_INDEX", str(session_index))
+
+
 class TestSessionQueries:
+    async def test_live_sessions_imports_codex_pinned_threads(
+        self, client, tmp_path, monkeypatch
+    ):
+        _write_codex_state(
+            tmp_path,
+            monkeypatch,
+            pinned_ids=["codex-pin-1"],
+            rows=[
+                {
+                    "id": "codex-pin-1",
+                    "title": "Pinned Codex thread",
+                    "cwd": "/Users/caopu/workspace/AgentMonitor",
+                    "git_sha": "abc1234",
+                    "git_branch": "main",
+                }
+            ],
+        )
+
+        resp = await client.get("/api/sessions/live")
+        assert resp.status_code == 200
+        session = next(
+            (
+                s
+                for s in resp.json()["sessions"]
+                if s["session_id"] == "codex-pin-1"
+            ),
+            None,
+        )
+        assert session is not None
+        assert session["session_pin"] is True
+        assert session["session_name"] == "Pinned Codex thread"
+        assert session["adapter_name"] == "codex-state"
+        assert session["workspace_cwd"] == "/Users/caopu/workspace/AgentMonitor"
+
+    async def test_live_sessions_keeps_terminal_codex_pinned_threads(
+        self, client, tmp_path, monkeypatch
+    ):
+        _write_codex_state(
+            tmp_path,
+            monkeypatch,
+            pinned_ids=["sess-done-pinned"],
+            rows=[
+                {
+                    "id": "sess-done-pinned",
+                    "title": "Pinned completed thread",
+                    "cwd": "/Users/caopu/workspace/AgentMonitor",
+                }
+            ],
+        )
+        await client.post(
+            "/api/events",
+            json=_make_event(
+                session_id="sess-done-pinned",
+                event_type="session.completed",
+                session_pin=False,
+            ),
+        )
+
+        resp = await client.get("/api/sessions/live")
+        assert resp.status_code == 200
+        session = next(
+            (
+                s
+                for s in resp.json()["sessions"]
+                if s["session_id"] == "sess-done-pinned"
+            ),
+            None,
+        )
+        assert session is not None
+        assert session["session_pin"] is True
+        assert session["current_status"] == "completed"
+
+    async def test_live_sessions_keeps_codex_pin_without_thread_metadata(
+        self, client, tmp_path, monkeypatch
+    ):
+        _write_codex_state(
+            tmp_path,
+            monkeypatch,
+            pinned_ids=["codex-pin-without-thread-row"],
+            rows=[],
+        )
+
+        resp = await client.get("/api/sessions/live")
+        assert resp.status_code == 200
+        session = next(
+            (
+                s
+                for s in resp.json()["sessions"]
+                if s["session_id"] == "codex-pin-without-thread-row"
+            ),
+            None,
+        )
+        assert session is not None
+        assert session["session_pin"] is True
+        assert session["session_name"] == "codex-pin-without-thread-row"
+
     async def test_live_sessions(self, client):
         await client.post("/api/events", json=_make_event(session_id="sess-live-1"))
         await client.post("/api/events", json=_make_event(session_id="sess-live-2"))

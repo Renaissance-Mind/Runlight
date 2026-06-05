@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_monitor.db.models import Session
@@ -87,7 +87,12 @@ async def get_live_sessions(db: AsyncSession, user_id: str) -> list[Session]:
     result = await db.execute(
         select(Session)
         .where(Session.user_id == user_id)
-        .where(Session.current_status.notin_(terminal))
+        .where(
+            or_(
+                Session.current_status.notin_(terminal),
+                Session.session_pin.is_(True),
+            )
+        )
         .order_by(Session.last_event_at.desc())
     )
     return list(result.scalars().all())
