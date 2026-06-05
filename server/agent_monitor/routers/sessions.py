@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_monitor.auth import resolve_user
 from agent_monitor.db.session import get_db
-from agent_monitor.services.codex_state_service import sync_codex_pinned_sessions
 from agent_monitor.services.event_service import get_events_for_session
 from agent_monitor.services.session_service import (
     get_all_sessions,
@@ -21,9 +20,8 @@ from agent_monitor.services.session_service import (
 router = APIRouter(prefix="/api", tags=["sessions"])
 
 
-async def _sync_codex_pins(db: AsyncSession, user_id: str) -> None:
-    changed = await sync_codex_pinned_sessions(db, user_id)
-    changed = await refresh_session_statuses(db, user_id) or changed
+async def _refresh_statuses(db: AsyncSession, user_id: str) -> None:
+    changed = await refresh_session_statuses(db, user_id)
     if changed:
         await db.commit()
 
@@ -76,7 +74,7 @@ async def live_sessions(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(resolve_user),
 ):
-    await _sync_codex_pins(db, user_id)
+    await _refresh_statuses(db, user_id)
     sessions = await get_live_sessions(db, user_id)
     return {"sessions": [_session_dict(s) for s in sessions]}
 
@@ -90,7 +88,7 @@ async def list_sessions(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(resolve_user),
 ):
-    await _sync_codex_pins(db, user_id)
+    await _refresh_statuses(db, user_id)
     sessions = await get_all_sessions(db, user_id, agent_type, status, limit, offset)
     return {"sessions": [_session_dict(s) for s in sessions]}
 
@@ -101,7 +99,7 @@ async def get_session(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(resolve_user),
 ):
-    await _sync_codex_pins(db, user_id)
+    await _refresh_statuses(db, user_id)
     session = await get_session_by_id(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -117,7 +115,7 @@ async def get_session_events(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(resolve_user),
 ):
-    await _sync_codex_pins(db, user_id)
+    await _refresh_statuses(db, user_id)
     session = await get_session_by_id(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")

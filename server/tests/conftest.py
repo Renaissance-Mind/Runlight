@@ -13,15 +13,6 @@ from agent_monitor.db.models import Base
 
 os.environ["AGENT_MONITOR_DATABASE_URL"] = "sqlite+aiosqlite://"
 os.environ["AGENT_MONITOR_TOKEN_MAP"] = "test-token-1:user-alice,test-token-2:user-bob"
-os.environ["AGENT_MONITOR_CODEX_GLOBAL_STATE"] = (
-    "/tmp/agent-monitor-test-missing-global-state.json"
-)
-os.environ["AGENT_MONITOR_CODEX_STATE_DB"] = (
-    "/tmp/agent-monitor-test-missing-state_5.sqlite"
-)
-os.environ["AGENT_MONITOR_CODEX_SESSION_INDEX"] = (
-    "/tmp/agent-monitor-test-missing-session_index.jsonl"
-)
 
 
 @pytest_asyncio.fixture
