@@ -1,0 +1,23 @@
+#!/bin/bash
+# Remove AgentMonitor hooks from Claude Code settings.json
+set -e
+
+CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
+
+if [ ! -f "$CLAUDE_SETTINGS" ]; then
+  echo "No settings.json found"
+  exit 0
+fi
+
+echo "Removing AgentMonitor hooks from Claude Code..."
+
+tmp=$(mktemp)
+jq '
+  .hooks |= with_entries(
+    .value |= map(
+      select(.hooks | all(.command | test("agent-monitor-hook.sh") | not))
+    )
+  )
+' "$CLAUDE_SETTINGS" > "$tmp" && mv "$tmp" "$CLAUDE_SETTINGS"
+
+echo "Done."
