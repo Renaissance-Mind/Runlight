@@ -55,6 +55,17 @@ _clean_session_name() {
 
 _resolve_session_name() {
   local name sid_sql
+  if [ -f "$CODEX_SESSION_INDEX" ] && command -v jq &>/dev/null; then
+    name="$(jq -r --arg sid "$SESSION_ID" '
+      select(.id == $sid)
+      | (.thread_name // "" | split("\n") | map(select(test("\\S"))) | .[0] // "")
+    ' "$CODEX_SESSION_INDEX" 2>/dev/null | tail -1)"
+    if [ -n "$name" ]; then
+      _clean_session_name "$name"
+      return 0
+    fi
+  fi
+
   if [ -f "$CODEX_STATE_DB" ] && command -v sqlite3 &>/dev/null; then
     sid_sql="$(_sql_escape "$SESSION_ID")"
     name="$(sqlite3 "$CODEX_STATE_DB" "SELECT title FROM threads WHERE id = '${sid_sql}' LIMIT 1;" 2>/dev/null)"
@@ -64,13 +75,7 @@ _resolve_session_name() {
     fi
   fi
 
-  if [ -f "$CODEX_SESSION_INDEX" ] && command -v jq &>/dev/null; then
-    name="$(jq -r --arg sid "$SESSION_ID" '
-      select(.id == $sid)
-      | (.thread_name // "" | split("\n") | map(select(test("\\S"))) | .[0] // "")
-    ' "$CODEX_SESSION_INDEX" 2>/dev/null | tail -1)"
-    _clean_session_name "$name"
-  fi
+  _clean_session_name ""
 }
 
 _resolve_session_pin() {

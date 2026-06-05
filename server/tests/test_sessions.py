@@ -41,6 +41,24 @@ class TestSessionQueries:
         )
         assert session["current_status"] == "finished"
 
+    async def test_non_terminal_event_revives_completed_session(self, client):
+        await client.post("/api/events", json=_make_event(
+            session_id="sess-revived", event_type="session.completed"
+        ))
+        await client.post("/api/events", json=_make_event(
+            session_id="sess-revived",
+            event_type="message.started",
+            session_name="Renamed session",
+        ))
+        resp = await client.get("/api/sessions/live")
+        assert resp.status_code == 200
+        session = next(
+            s for s in resp.json()["sessions"] if s["session_id"] == "sess-revived"
+        )
+        assert session["current_status"] == "running"
+        assert session["terminal_result"] is None
+        assert session["session_name"] == "Renamed session"
+
     async def test_list_all_sessions(self, client):
         await client.post("/api/events", json=_make_event(session_id="sess-all-1"))
         await client.post("/api/events", json=_make_event(

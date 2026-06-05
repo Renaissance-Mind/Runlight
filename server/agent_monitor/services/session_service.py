@@ -65,6 +65,8 @@ async def upsert_session(db: AsyncSession, envelope: EventEnvelope, user_id: str
 
     if envelope.event_type in TERMINAL_EVENT_TYPES:
         session.terminal_result = envelope.event_type.split(".")[-1]
+    else:
+        session.terminal_result = None
 
     session.latest_event_type = envelope.event_type
     session.last_event_at = envelope.event_time
