@@ -15,8 +15,14 @@ if [ -f "$SETTINGS_FILE" ] && command -v jq &>/dev/null; then
   _cfg_token="$(jq -r '.token // empty' "$SETTINGS_FILE" 2>/dev/null)"
 fi
 
-AGENT_MONITOR_SERVER_URL="${AGENT_MONITOR_SERVER_URL:-${_cfg_url:-http://127.0.0.1:8766}}"
-AGENT_MONITOR_TOKEN="${AGENT_MONITOR_TOKEN:-${_cfg_token:-}}"
+_trim() {
+  printf "%s" "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+AGENT_MONITOR_SERVER_URL="$(_trim "${AGENT_MONITOR_SERVER_URL:-${_cfg_url:-http://127.0.0.1:8766}}")"
+AGENT_MONITOR_SERVER_URL="$(printf "%s" "$AGENT_MONITOR_SERVER_URL" | sed 's#/*$##')"
+[ -z "$AGENT_MONITOR_SERVER_URL" ] && AGENT_MONITOR_SERVER_URL="http://127.0.0.1:8766"
+AGENT_MONITOR_TOKEN="$(_trim "${AGENT_MONITOR_TOKEN:-${_cfg_token:-}}")"
 CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
 CODEX_STATE_DB="${AGENT_MONITOR_CODEX_STATE_DB:-${CODEX_HOME_DIR}/state_5.sqlite}"
 CODEX_GLOBAL_STATE="${AGENT_MONITOR_CODEX_GLOBAL_STATE:-${CODEX_HOME_DIR}/.codex-global-state.json}"

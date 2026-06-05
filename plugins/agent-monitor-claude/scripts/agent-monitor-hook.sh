@@ -3,8 +3,14 @@
 trap 'exit 0' ERR EXIT
 set +e +u
 
-AGENT_MONITOR_SERVER_URL="${AGENT_MONITOR_SERVER_URL:-http://127.0.0.1:8766}"
-AGENT_MONITOR_TOKEN="${AGENT_MONITOR_TOKEN:-}"
+_trim() {
+  printf "%s" "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+AGENT_MONITOR_SERVER_URL="$(_trim "${AGENT_MONITOR_SERVER_URL:-http://127.0.0.1:8766}")"
+AGENT_MONITOR_SERVER_URL="$(printf "%s" "$AGENT_MONITOR_SERVER_URL" | sed 's#/*$##')"
+[ -z "$AGENT_MONITOR_SERVER_URL" ] && AGENT_MONITOR_SERVER_URL="http://127.0.0.1:8766"
+AGENT_MONITOR_TOKEN="$(_trim "${AGENT_MONITOR_TOKEN:-}")"
 
 _STDIN="$(cat)"
 

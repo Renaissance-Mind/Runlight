@@ -21,6 +21,14 @@ class TestBaseClient:
             client = AgentMonitorClient()
             assert client.server_url == "http://custom:9999"
 
+    def test_init_empty_token_omits_auth_header(self, monkeypatch):
+        monkeypatch.setenv("AGENT_MONITOR_TOKEN", "   ")
+
+        client = AgentMonitorClient(token="")
+
+        assert client.token is None
+        assert "Authorization" not in client._headers()
+
     def test_build_event(self):
         client = AgentMonitorClient(agent_type="test")
         event = client._build_event(

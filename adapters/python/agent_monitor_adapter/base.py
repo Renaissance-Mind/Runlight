@@ -82,11 +82,15 @@ class AgentMonitorClient:
         max_retries: int = 3,
         redact_keys: list[str] | None = None,
     ):
-        self.server_url = (
+        raw_server_url = (
             server_url
             or os.environ.get("AGENT_MONITOR_SERVER_URL", "http://127.0.0.1:8766")
-        ).rstrip("/")
-        self.token = token or os.environ.get("AGENT_MONITOR_TOKEN")
+        )
+        self.server_url = raw_server_url.strip().rstrip("/")
+        raw_token = token if token is not None else os.environ.get("AGENT_MONITOR_TOKEN")
+        self.token = raw_token.strip() if raw_token is not None else None
+        if self.token == "":
+            self.token = None
         self.agent_type = agent_type
         self.adapter_name = adapter_name
         self.adapter_version = adapter_version
