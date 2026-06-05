@@ -19,29 +19,34 @@ from agent_monitor_adapter.base import AgentMonitorClient
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    command = [c for c in args.command if c != "--"]
+    if not command:
+        print("No command specified", file=sys.stderr)
+        return 1
+
     client = AgentMonitorClient(
         agent_type=args.agent,
         adapter_name="cli-wrapper",
     )
 
-    cmd_str = " ".join(args.command[:3])
+    cmd_str = " ".join(command[:3])
     session_id = client.start_session(summary=f"CLI: {cmd_str}")
     print(f"AgentMonitor session: {session_id}")
 
     client.record_event(
         "command.started",
         summary=f"Running: {cmd_str}",
-        payload={"command": args.command[:5]},
+        payload={"command": command[:5]},
     )
 
     start_time = time.monotonic()
     try:
-        proc = subprocess.run(args.command, cwd=os.getcwd())
+        proc = subprocess.run(command, cwd=os.getcwd())
         exit_code = proc.returncode
     except KeyboardInterrupt:
         exit_code = 130
     except FileNotFoundError:
-        print(f"Command not found: {args.command[0]}", file=sys.stderr)
+        print(f"Command not found: {command[0]}", file=sys.stderr)
         exit_code = 127
 
     duration_ms = int((time.monotonic() - start_time) * 1000)
@@ -51,7 +56,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         severity="info" if exit_code == 0 else "warning",
         summary=f"Exit {exit_code}: {cmd_str}",
         payload={
-            "command": args.command[:5],
+            "command": command[:5],
             "exit_code": exit_code,
             "duration_ms": duration_ms,
         },
