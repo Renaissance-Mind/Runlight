@@ -74,6 +74,46 @@ export function groupSessionsByProject<T extends ProjectSessionInput>(
   }));
 }
 
+export function mergeProjectOrder(
+  projectNames: string[],
+  savedOrder: string[],
+): string[] {
+  const uniqueProjectNames = Array.from(new Set(projectNames));
+  const currentProjects = new Set(uniqueProjectNames);
+  const merged = savedOrder.filter((name) => currentProjects.has(name));
+  const seen = new Set(merged);
+
+  for (const name of uniqueProjectNames) {
+    if (!seen.has(name)) {
+      merged.push(name);
+      seen.add(name);
+    }
+  }
+
+  return merged;
+}
+
+export function moveProjectInOrder(
+  projectOrder: string[],
+  projectName: string,
+  direction: "up" | "down",
+): string[] {
+  const index = projectOrder.indexOf(projectName);
+  if (index === -1) return projectOrder;
+
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= projectOrder.length) {
+    return projectOrder;
+  }
+
+  const nextOrder = [...projectOrder];
+  [nextOrder[index], nextOrder[targetIndex]] = [
+    nextOrder[targetIndex],
+    nextOrder[index],
+  ];
+  return nextOrder;
+}
+
 export function summarizeSessionsForSurface(
   sessions: SessionSurfaceInput[],
 ): SessionSurfaceSummary {

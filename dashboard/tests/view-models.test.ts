@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   groupSessionsByProject,
+  mergeProjectOrder,
+  moveProjectInOrder,
   summarizeSessionsForSurface,
 } from "../src/api/viewModels.ts";
 
@@ -77,6 +79,47 @@ describe("pet-ready session view models", () => {
         { projectName: "Flow-Factory", sessionIds: ["s2"] },
         { projectName: "Unknown project", sessionIds: ["s4"] },
       ],
+    );
+  });
+
+  it("keeps saved project order and appends new projects", () => {
+    assert.deepEqual(
+      mergeProjectOrder(["Beta", "Alpha", "Gamma"], ["Alpha", "Beta"]),
+      ["Alpha", "Beta", "Gamma"],
+    );
+  });
+
+  it("removes missing projects from saved project order", () => {
+    assert.deepEqual(mergeProjectOrder(["Beta", "Gamma"], ["Alpha", "Beta"]), [
+      "Beta",
+      "Gamma",
+    ]);
+  });
+
+  it("moves projects within the saved order", () => {
+    assert.deepEqual(moveProjectInOrder(["Alpha", "Beta", "Gamma"], "Beta", "up"), [
+      "Beta",
+      "Alpha",
+      "Gamma",
+    ]);
+    assert.deepEqual(
+      moveProjectInOrder(["Alpha", "Beta", "Gamma"], "Beta", "down"),
+      ["Alpha", "Gamma", "Beta"],
+    );
+  });
+
+  it("keeps project order unchanged at movement boundaries", () => {
+    assert.deepEqual(
+      moveProjectInOrder(["Alpha", "Beta", "Gamma"], "Alpha", "up"),
+      ["Alpha", "Beta", "Gamma"],
+    );
+    assert.deepEqual(
+      moveProjectInOrder(["Alpha", "Beta", "Gamma"], "Gamma", "down"),
+      ["Alpha", "Beta", "Gamma"],
+    );
+    assert.deepEqual(
+      moveProjectInOrder(["Alpha", "Beta", "Gamma"], "Missing", "down"),
+      ["Alpha", "Beta", "Gamma"],
     );
   });
 });
