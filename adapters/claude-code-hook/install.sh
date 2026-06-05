@@ -23,8 +23,13 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
-# If a server URL is passed as argument, write it to settings.json
-if [ -n "${1:-}" ]; then
+# Seed settings.json on first install, then let an explicit argument update
+# only the server_url field.
+if [ ! -f "$SETTINGS_FILE" ]; then
+  jq -n \
+    --arg url "${1:-http://127.0.0.1:8766}" \
+    '{server_url: $url, token: ""}' > "$SETTINGS_FILE"
+elif [ -n "${1:-}" ]; then
   tmp=$(mktemp)
   jq --arg url "$1" '.server_url = $url' "$SETTINGS_FILE" > "$tmp" && mv "$tmp" "$SETTINGS_FILE"
 fi

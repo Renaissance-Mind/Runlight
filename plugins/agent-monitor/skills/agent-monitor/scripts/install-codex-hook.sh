@@ -1,30 +1,23 @@
 #!/bin/bash
-# ============================================================
-# Install AgentMonitor hook into Codex
-# Usage: ./install.sh [server_url]
-#
-# Configuration lives in settings.json next to the hook script.
-# Edit settings.json to change server_url or token at any time.
-# ============================================================
+# Install AgentMonitor hook entries for Codex from the packaged plugin skill.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK_SCRIPT="${SCRIPT_DIR}/agent-monitor-hook.sh"
 SETTINGS_FILE="${SCRIPT_DIR}/settings.json"
-CODEX_HOOKS_JSON="${HOME}/.codex/hooks.json"
-
-if [ ! -f "$CODEX_HOOKS_JSON" ]; then
-  echo "Error: ${CODEX_HOOKS_JSON} not found. Is Codex installed?"
-  exit 1
-fi
+CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
+CODEX_HOOKS_JSON="${CODEX_HOME_DIR}/hooks.json"
 
 if ! command -v jq &>/dev/null; then
   echo "Error: jq is required"
   exit 1
 fi
 
-# Seed settings.json on first install, then let an explicit argument update
-# only the server_url field.
+mkdir -p "$CODEX_HOME_DIR"
+if [ ! -f "$CODEX_HOOKS_JSON" ]; then
+  jq -n '{hooks: {}}' > "$CODEX_HOOKS_JSON"
+fi
+
 if [ ! -f "$SETTINGS_FILE" ]; then
   jq -n \
     --arg url "${1:-http://127.0.0.1:8766}" \
@@ -40,6 +33,7 @@ SERVER_URL="$(jq -r '.server_url' "$SETTINGS_FILE" 2>/dev/null)"
 echo "Installing AgentMonitor hook for Codex..."
 echo "  Hook script: ${HOOK_SCRIPT}"
 echo "  Settings:    ${SETTINGS_FILE}"
+echo "  Hooks file:  ${CODEX_HOOKS_JSON}"
 echo "  Server URL:  ${SERVER_URL}"
 
 HOOK_CMD="bash ${HOOK_SCRIPT}"
@@ -66,7 +60,7 @@ add_hook() {
   local existing
   existing=$(jq -r ".hooks.${event} // [] | .[] | .hooks[]?.command // empty" "$CODEX_HOOKS_JSON" 2>/dev/null)
 
-  if echo "$existing" | grep -q "agent-monitor-hook.sh"; then
+  if echo "$existing" | grep -q "$HOOK_SCRIPT"; then
     echo "  [skip] ${event}: already installed"
     return
   fi
