@@ -62,12 +62,16 @@ class TestIngestSingleEvent:
     async def test_ingest_with_machine_and_workspace(self, client):
         ev = _make_event(
             session_id="sess-meta",
+            session_name="Fix local hooks",
+            session_pin=True,
             machine={"hostname": "dev-box", "os": "darwin"},
             workspace={"cwd": "/project", "git_branch": "main"},
         )
         await client.post("/api/events", json=ev)
         resp = await client.get("/api/sessions/sess-meta")
         data = resp.json()
+        assert data["session_name"] == "Fix local hooks"
+        assert data["session_pin"] is True
         assert data["machine_hostname"] == "dev-box"
         assert data["workspace_cwd"] == "/project"
         assert data["workspace_git_branch"] == "main"

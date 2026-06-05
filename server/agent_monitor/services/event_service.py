@@ -24,6 +24,8 @@ async def store_event(db: AsyncSession, envelope: EventEnvelope, user_id: str) -
     event = Event(
         event_id=envelope.event_id,
         session_id=envelope.session_id,
+        session_name=envelope.session_name,
+        session_pin=envelope.session_pin,
         user_id=user_id,
         agent_type=envelope.agent_type,
         adapter_name=envelope.adapter_name,

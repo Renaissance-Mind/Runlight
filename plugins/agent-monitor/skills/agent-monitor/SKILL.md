@@ -40,6 +40,10 @@ Edit `scripts/settings.json` when the server URL or token needs to change:
 
 Prefer this settings file over embedding secrets or URLs in hook commands.
 
+The Codex hook also reads local Codex state files to attach `session_name` and
+`session_pin` to each AgentMonitor event. `session_name` comes from the local
+thread title, and `session_pin` comes from Codex's pinned-thread state.
+
 ## Verify
 
 After installation:

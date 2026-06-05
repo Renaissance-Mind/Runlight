@@ -17,6 +17,8 @@ from agent_monitor.protocol import (
 def _make_event(**overrides) -> dict:
     base = {
         "session_id": "sess-001",
+        "session_name": "Investigate sessions",
+        "session_pin": True,
         "agent_type": "codex",
         "adapter_name": "codex-hook",
         "event_type": "session.started",
@@ -30,6 +32,8 @@ class TestEventEnvelope:
     def test_valid_minimal_event(self):
         ev = EventEnvelope(**_make_event())
         assert ev.session_id == "sess-001"
+        assert ev.session_name == "Investigate sessions"
+        assert ev.session_pin is True
         assert ev.agent_type == "codex"
         assert ev.severity == Severity.INFO
         assert ev.event_id  # auto-generated

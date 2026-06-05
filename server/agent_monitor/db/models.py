@@ -35,6 +35,8 @@ class Session(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     session_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    session_name: Mapped[str | None] = mapped_column(Text)
+    session_pin: Mapped[bool] = mapped_column(default=False)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     agent_type: Mapped[str] = mapped_column(String(100), nullable=False)
     adapter_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -74,6 +76,8 @@ class Event(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     event_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     session_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    session_name: Mapped[str | None] = mapped_column(Text)
+    session_pin: Mapped[bool] = mapped_column(default=False)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     agent_type: Mapped[str] = mapped_column(String(100), nullable=False)
     adapter_name: Mapped[str] = mapped_column(String(100), nullable=False)

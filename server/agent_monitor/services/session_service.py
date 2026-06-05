@@ -23,6 +23,8 @@ async def upsert_session(db: AsyncSession, envelope: EventEnvelope, user_id: str
     if session is None:
         session = Session(
             session_id=envelope.session_id,
+            session_name=envelope.session_name,
+            session_pin=envelope.session_pin,
             user_id=user_id,
             agent_type=envelope.agent_type,
             adapter_name=envelope.adapter_name,
@@ -32,6 +34,10 @@ async def upsert_session(db: AsyncSession, envelope: EventEnvelope, user_id: str
             event_count=0,
         )
         db.add(session)
+
+    if envelope.session_name:
+        session.session_name = envelope.session_name
+    session.session_pin = envelope.session_pin
 
     if envelope.machine:
         session.machine_hostname = envelope.machine.hostname

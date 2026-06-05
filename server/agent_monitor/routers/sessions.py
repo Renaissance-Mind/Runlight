@@ -22,6 +22,8 @@ router = APIRouter(prefix="/api", tags=["sessions"])
 def _session_dict(s) -> dict:
     return {
         "session_id": s.session_id,
+        "session_name": s.session_name,
+        "session_pin": s.session_pin,
         "user_id": s.user_id,
         "agent_type": s.agent_type,
         "adapter_name": s.adapter_name,
@@ -47,6 +49,8 @@ def _event_dict(e) -> dict:
     return {
         "event_id": e.event_id,
         "session_id": e.session_id,
+        "session_name": e.session_name,
+        "session_pin": e.session_pin,
         "event_type": e.event_type,
         "event_time": e.event_time.isoformat() if e.event_time else None,
         "received_time": e.received_time.isoformat() if e.received_time else None,

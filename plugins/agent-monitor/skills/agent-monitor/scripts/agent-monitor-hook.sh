@@ -13,6 +13,10 @@ fi
 
 AGENT_MONITOR_SERVER_URL="${AGENT_MONITOR_SERVER_URL:-${_cfg_url:-http://127.0.0.1:8766}}"
 AGENT_MONITOR_TOKEN="${AGENT_MONITOR_TOKEN:-${_cfg_token:-}}"
+CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
+CODEX_STATE_DB="${AGENT_MONITOR_CODEX_STATE_DB:-${CODEX_HOME_DIR}/state_5.sqlite}"
+CODEX_GLOBAL_STATE="${AGENT_MONITOR_CODEX_GLOBAL_STATE:-${CODEX_HOME_DIR}/.codex-global-state.json}"
+CODEX_SESSION_INDEX="${AGENT_MONITOR_CODEX_SESSION_INDEX:-${CODEX_HOME_DIR}/session_index.jsonl}"
 
 _STDIN="$(cat)"
 
@@ -27,6 +31,47 @@ CWD="$(_jq '.cwd')"
 MODEL="$(_jq '.model')"
 
 [ -z "$SESSION_ID" ] && exit 0
+
+_sql_escape() {
+  printf "%s" "$1" | sed "s/'/''/g"
+}
+
+_clean_session_name() {
+  printf "%s" "$1" | tr '\r' '\n' | sed '/^[[:space:]]*$/d' | head -1 | cut -c1-240
+}
+
+_resolve_session_name() {
+  local name sid_sql
+  if [ -f "$CODEX_STATE_DB" ] && command -v sqlite3 &>/dev/null; then
+    sid_sql="$(_sql_escape "$SESSION_ID")"
+    name="$(sqlite3 "$CODEX_STATE_DB" "SELECT title FROM threads WHERE id = '${sid_sql}' LIMIT 1;" 2>/dev/null)"
+    if [ -n "$name" ]; then
+      _clean_session_name "$name"
+      return 0
+    fi
+  fi
+
+  if [ -f "$CODEX_SESSION_INDEX" ] && command -v jq &>/dev/null; then
+    name="$(jq -r --arg sid "$SESSION_ID" '
+      select(.id == $sid)
+      | (.thread_name // "" | split("\n") | map(select(test("\\S"))) | .[0] // "")
+    ' "$CODEX_SESSION_INDEX" 2>/dev/null | tail -1)"
+    _clean_session_name "$name"
+  fi
+}
+
+_resolve_session_pin() {
+  if [ -f "$CODEX_GLOBAL_STATE" ] && command -v jq &>/dev/null; then
+    if jq -e --arg sid "$SESSION_ID" '.["pinned-thread-ids"] // [] | index($sid)' "$CODEX_GLOBAL_STATE" >/dev/null 2>&1; then
+      printf "true"
+      return 0
+    fi
+  fi
+  printf "false"
+}
+
+SESSION_NAME="$(_resolve_session_name)"
+SESSION_PIN="$(_resolve_session_pin)"
 
 _send_event() {
   local event_type="$1"
@@ -47,6 +92,8 @@ _send_event() {
   local json
   json=$(jq -n \
     --arg sid "$SESSION_ID" \
+    --arg sname "$SESSION_NAME" \
+    --argjson spin "$SESSION_PIN" \
     --arg et "$event_type" \
     --arg ts "$ts" \
     --arg sev "$severity" \
@@ -62,6 +109,8 @@ _send_event() {
     --argjson payload "${payload:-null}" \
     '{
       session_id: $sid,
+      session_name: $sname,
+      session_pin: $spin,
       agent_type: "codex",
       adapter_name: "codex-hook",
       adapter_version: "0.1.0",

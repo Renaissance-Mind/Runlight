@@ -66,7 +66,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
           <tr className="text-gray-500 border-b border-surface-3 text-left">
             <th className="px-3 py-2">Status</th>
             <th className="px-3 py-2">Agent</th>
-            <th className="px-3 py-2">Summary</th>
+            <th className="px-3 py-2">Session</th>
             <th className="px-3 py-2">Machine</th>
             <th className="px-3 py-2">Path</th>
             <th className="px-3 py-2">Branch</th>
@@ -92,8 +92,11 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                   to={`/sessions/${s.session_id}`}
                   className="hover:text-white transition-colors"
                 >
-                  {s.summary || (
+                  {s.session_name || s.summary || (
                     <span className="text-gray-500 italic">No summary</span>
+                  )}
+                  {s.session_pin && (
+                    <span className="text-accent-yellow ml-1">PIN</span>
                   )}
                   {s.summary_inferred && (
                     <span className="text-gray-600 ml-1">(inferred)</span>

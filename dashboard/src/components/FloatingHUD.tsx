@@ -46,7 +46,7 @@ export default function FloatingHUD({ sessions }: Props) {
       </div>
       {latestEvent && (
         <div className="mt-2 text-[10px] text-gray-500 truncate">
-          Latest: {latestEvent.latest_event_type} — {latestEvent.summary || latestEvent.session_id}
+          Latest: {latestEvent.latest_event_type} — {latestEvent.session_name || latestEvent.summary || latestEvent.session_id}
         </div>
       )}
     </div>

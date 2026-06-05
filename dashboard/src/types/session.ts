@@ -1,5 +1,7 @@
 export interface Session {
   session_id: string;
+  session_name: string | null;
+  session_pin: boolean;
   user_id: string;
   agent_type: string;
   adapter_name: string;
@@ -23,6 +25,8 @@ export interface Session {
 export interface SessionEvent {
   event_id: string;
   session_id: string;
+  session_name: string | null;
+  session_pin: boolean;
   event_type: string;
   event_time: string | null;
   received_time: string | null;

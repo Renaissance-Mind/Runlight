@@ -70,6 +70,8 @@ class WorkspaceInfo(BaseModel):
 class EventEnvelope(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
+    session_name: str | None = None
+    session_pin: bool = False
     user_id: str | None = None
     agent_type: str
     adapter_name: str

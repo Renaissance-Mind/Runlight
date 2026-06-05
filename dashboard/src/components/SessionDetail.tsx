@@ -66,11 +66,18 @@ export default function SessionDetail() {
         </Link>
         <StatusBadge status={session.current_status} size="md" />
         <h2 className="text-sm font-medium text-white truncate">
-          {session.summary || session.session_id}
+          {session.session_name || session.summary || session.session_id}
         </h2>
+        {session.session_pin && (
+          <span className="text-[10px] text-accent-yellow border border-accent-yellow/40 rounded px-1.5 py-0.5">
+            PIN
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <MetaCard label="Session Name" value={session.session_name} />
+        <MetaCard label="Pinned" value={session.session_pin ? "true" : "false"} />
         <MetaCard label="Agent" value={session.agent_type} />
         <MetaCard label="Adapter" value={session.adapter_name} />
         <MetaCard label="Machine" value={session.machine_hostname} />
