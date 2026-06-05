@@ -296,7 +296,7 @@ Run:
 
 ```bash
 cd server && /Users/caopu/miniforge3/bin/python -m pytest tests/test_config.py
-rg -n "8765" docs server adapters plugins dashboard
+rg -n "876[5]" docs server adapters plugins dashboard
 ```
 
 - [ ] **Step 4: Commit**
