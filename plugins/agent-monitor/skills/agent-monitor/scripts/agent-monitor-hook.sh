@@ -32,6 +32,7 @@ _jq() {
 
 HOOK_EVENT="$(_jq '.hook_event_name')"
 SESSION_ID="$(_jq '.session_id')"
+TRANSCRIPT_PATH="$(_jq '.transcript_path')"
 TOOL_NAME="$(_jq '.tool_name')"
 CWD="$(_jq '.cwd')"
 MODEL="$(_jq '.model')"
@@ -41,6 +42,21 @@ MODEL="$(_jq '.model')"
 _sql_escape() {
   printf "%s" "$1" | sed "s/'/''/g"
 }
+
+_session_id_exists_in_codex_state() {
+  if [ -f "$CODEX_STATE_DB" ] && command -v sqlite3 &>/dev/null; then
+    local sid_sql found
+    sid_sql="$(_sql_escape "$SESSION_ID")"
+    found="$(sqlite3 "$CODEX_STATE_DB" "SELECT 1 FROM threads WHERE id = '${sid_sql}' LIMIT 1;" 2>/dev/null)"
+    [ "$found" = "1" ]
+    return $?
+  fi
+  return 1
+}
+
+if [ -z "$TRANSCRIPT_PATH" ] && ! _session_id_exists_in_codex_state; then
+  exit 0
+fi
 
 _clean_session_name() {
   printf "%s" "$1" | tr '\r' '\n' | sed '/^[[:space:]]*$/d' | head -1 | cut -c1-240
