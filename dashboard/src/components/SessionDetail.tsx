@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import type { Session, SessionEvent } from "../types/session";
-import { fetchSession, fetchSessionEvents } from "../api/client";
+import { deleteSession, fetchSession, fetchSessionEvents } from "../api/client";
 import StatusBadge from "./StatusBadge";
 import type { DashboardConnectionConfig } from "../api/config";
 
 function formatTime(isoStr: string | null): string {
   if (!isoStr) return "-";
   return new Date(isoStr).toLocaleString();
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -26,37 +30,86 @@ export default function SessionDetail({
   const [session, setSession] = useState<Session | null>(null);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!sessionId) return;
-    Promise.all([
-      fetchSession(sessionId, config),
-      fetchSessionEvents(sessionId, config),
-    ])
-      .then(([s, evts]) => {
-        setSession(s);
-        setEvents(evts);
-      })
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setLoadError(null);
+      setEventsError(null);
+
+      try {
+        const nextSession = await fetchSession(sessionId, config);
+        if (cancelled) return;
+        setSession(nextSession);
+      } catch (err) {
+        if (cancelled) return;
+        setLoadError(errorMessage(err));
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const nextEvents = await fetchSessionEvents(sessionId, config);
+        if (cancelled) return;
+        setEvents(nextEvents);
+        setEventsError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setEvents([]);
+        setEventsError(errorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
 
     const interval = setInterval(async () => {
       try {
-        const [s, evts] = await Promise.all([
-          fetchSession(sessionId, config),
-          fetchSessionEvents(sessionId, config),
-        ]);
-        setSession(s);
-        setEvents(evts);
-      } catch {
-        /* ignore refresh errors */
+        const nextSession = await fetchSession(sessionId, config);
+        if (cancelled) return;
+        setSession(nextSession);
+        setLoadError(null);
+      } catch (err) {
+        if (!cancelled) setLoadError(errorMessage(err));
+        return;
+      }
+
+      try {
+        const nextEvents = await fetchSessionEvents(sessionId, config);
+        if (cancelled) return;
+        setEvents(nextEvents);
+        setEventsError(null);
+      } catch (err) {
+        if (!cancelled) setEventsError(errorMessage(err));
       }
     }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [sessionId, config]);
 
   if (loading) {
     return <div className="p-4 text-gray-500 animate-pulse">Loading...</div>;
+  }
+
+  if (loadError && !session) {
+    return (
+      <div className="p-4 text-accent-red">
+        Failed to load session: {loadError}
+      </div>
+    );
   }
 
   if (!session) {
@@ -65,6 +118,16 @@ export default function SessionDetail({
 
   return (
     <div className="space-y-4">
+      {loadError && (
+        <div className="rounded bg-surface-2 px-3 py-2 text-xs text-accent-red">
+          Failed to refresh session: {loadError}
+        </div>
+      )}
+      {deleteError && (
+        <div className="rounded bg-surface-2 px-3 py-2 text-xs text-accent-red">
+          Failed to delete session: {deleteError}
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <Link
           to="/"
@@ -81,6 +144,26 @@ export default function SessionDetail({
             PIN
           </span>
         )}
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={async () => {
+            if (!sessionId) return;
+            if (!window.confirm("Delete this session and its events?")) return;
+            setDeleting(true);
+            setDeleteError(null);
+            try {
+              await deleteSession(sessionId, config);
+              navigate("/");
+            } catch (err) {
+              setDeleteError(errorMessage(err));
+              setDeleting(false);
+            }
+          }}
+          className="ml-auto rounded border border-accent-red/40 px-2 py-1 text-xs text-accent-red transition-colors hover:bg-accent-red/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {deleting ? "Deleting..." : "Delete"}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
@@ -104,6 +187,11 @@ export default function SessionDetail({
         <h3 className="text-xs text-gray-500 mb-2 uppercase tracking-wider">
           Event Timeline ({events.length})
         </h3>
+        {eventsError && (
+          <div className="mb-2 rounded bg-surface-2 px-3 py-2 text-xs text-accent-red">
+            Failed to load events: {eventsError}
+          </div>
+        )}
         <div className="space-y-0.5">
           {events.map((ev) => (
             <div

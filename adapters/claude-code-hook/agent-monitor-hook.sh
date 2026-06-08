@@ -51,7 +51,9 @@ _send_event() {
   user_val="$(whoami 2>/dev/null || echo unknown)"
   branch_val="$(git -C "${CWD:-.}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
   commit_val="$(git -C "${CWD:-.}" rev-parse --short HEAD 2>/dev/null || echo "")"
-  project_val="$(basename "${CWD:-.}" 2>/dev/null || echo "")"
+  local repo_root
+  repo_root="$(git -C "${CWD:-.}" rev-parse --show-toplevel 2>/dev/null || echo "")"
+  project_val="$(basename "${repo_root:-${CWD:-.}}" 2>/dev/null || echo "")"
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   local json
@@ -66,6 +68,7 @@ _send_event() {
     --arg arch "$arch_val" \
     --arg usr "$user_val" \
     --arg cwd "${CWD:-.}" \
+    --arg rr "$repo_root" \
     --arg br "$branch_val" \
     --arg cm "$commit_val" \
     --arg pn "$project_val" \
@@ -80,7 +83,7 @@ _send_event() {
       severity: $sev,
       summary: $sum,
       machine: {hostname: $hn, os: $os, arch: $arch, user: $usr},
-      workspace: {cwd: $cwd, git_branch: $br, git_commit: $cm, project_name: $pn},
+      workspace: {cwd: $cwd, repo_root: $rr, git_branch: $br, git_commit: $cm, project_name: $pn},
       payload: $payload
     }' 2>/dev/null) || return 0
 

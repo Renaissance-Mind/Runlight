@@ -11,11 +11,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK_SCRIPT="${SCRIPT_DIR}/agent-monitor-hook.sh"
 SETTINGS_FILE="${SCRIPT_DIR}/settings.json"
-CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
+CLAUDE_SETTINGS="${CLAUDE_SETTINGS_FILE:-${HOME}/.claude/settings.json}"
 
 if [ ! -f "$CLAUDE_SETTINGS" ]; then
-  echo "Error: ${CLAUDE_SETTINGS} not found. Is Claude Code installed?"
-  exit 1
+  mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
+  echo '{}' > "$CLAUDE_SETTINGS"
 fi
 
 if ! command -v jq &>/dev/null; then
@@ -55,7 +55,7 @@ for event in "${EVENTS[@]}"; do
   fi
 
   tmp=$(mktemp)
-  jq ".hooks.${event} = (.hooks.${event} // []) + [{hooks: [{type: \"command\", command: $(printf '%s' "$HOOK_CMD" | jq -Rs .), timeout: 5}]}]" "$CLAUDE_SETTINGS" > "$tmp"
+  jq ".hooks.${event} = (.hooks.${event} // []) + [{hooks: [{type: \"command\", command: $(printf '%s' "$HOOK_CMD" | jq -Rs .), timeout: 5, async: true}]}]" "$CLAUDE_SETTINGS" > "$tmp"
   mv "$tmp" "$CLAUDE_SETTINGS"
   echo "  [add]  ${event}"
 done

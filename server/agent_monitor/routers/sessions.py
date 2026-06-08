@@ -11,6 +11,7 @@ from agent_monitor.auth import resolve_user
 from agent_monitor.db.session import get_db
 from agent_monitor.services.event_service import get_events_for_session
 from agent_monitor.services.session_service import (
+    delete_session,
     get_all_sessions,
     get_live_sessions,
     get_session_by_id,
@@ -106,6 +107,22 @@ async def get_session(
     if session.user_id != user_id:
         raise HTTPException(status_code=404, detail="Session not found")
     return _session_dict(session)
+
+
+@router.delete("/sessions/{session_id}")
+async def remove_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(resolve_user),
+):
+    session = await get_session_by_id(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await delete_session(db, session_id)
+    await db.commit()
+    return {"deleted": session_id}
 
 
 @router.get("/sessions/{session_id}/events")

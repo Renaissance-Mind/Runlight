@@ -115,6 +115,70 @@ For the installed Codex plugin, edit:
 ~/.codex/plugins/cache/agent-monitor-local/agent-monitor/0.1.0/skills/agent-monitor/scripts/settings.json
 ```
 
+Installing the Codex plugin makes the skill available; it does not itself write
+Codex lifecycle hooks. Run the packaged skill installer after plugin install or
+update:
+
+```bash
+bash ~/.codex/plugins/cache/agent-monitor-local/agent-monitor/0.1.0/skills/agent-monitor/scripts/install-codex-hook.sh
+```
+
+The repository adapter installer is for local development. It writes to
+`$CODEX_HOME/hooks.json` when `CODEX_HOME` is set, otherwise `~/.codex/hooks.json`.
+
+## Configure Claude Code Hook Client
+
+The Claude Code plugin declares a hook inventory in its plugin manifest, but the
+reliable local install path is still the packaged installer because current
+Claude Code plugin loading does not consistently register hooks from plugin
+metadata.
+
+```bash
+cd /Users/caopu/workspace/AgentMonitor/plugins/agent-monitor-claude
+bash install.sh --server http://127.0.0.1:8766
+```
+
+The installer writes hooks into `~/.claude/settings.json` and stores runtime
+connection options under `pluginConfigs`. The hook reads these keys, with
+`AGENT_MONITOR_SERVER_URL` and `AGENT_MONITOR_TOKEN` taking precedence.
+
+The repository adapter under `adapters/claude-code-hook` is for local
+development. It stores connection settings in `adapters/claude-code-hook/settings.json`
+and can target a non-default Claude settings file with `CLAUDE_SETTINGS_FILE`.
+
+## Configure Python Or Generic CLI Clients
+
+The Python adapter uses environment variables:
+
+```bash
+export AGENT_MONITOR_SERVER_URL=http://127.0.0.1:8766
+export AGENT_MONITOR_TOKEN=
+```
+
+The CLI wrapper is installed by the `agent-monitor-adapter` package and exposes:
+
+```bash
+agent-monitor run --agent codex -- <command>
+agent-monitor event --session <id> --type <event_type>
+agent-monitor heartbeat --session <id>
+agent-monitor finish --session <id> --result completed
+```
+
+Python clients send heartbeat, sequence, dedupe, and offline-queue metadata; the
+shell hook clients remain fail-open and best-effort.
+
+## Configure Worker Server
+
+For the Cloudflare Worker deployment, the same client URL/token contract applies.
+The Worker environment names are platform-specific:
+
+```bash
+npx wrangler secret put TOKEN_MAP
+```
+
+Use `TOKEN_MAP` with the same `token:user_id` value format as
+`AGENT_MONITOR_TOKEN_MAP` on the FastAPI server.
+
 ## Configure Dashboard
 
 Open the dashboard settings page:
@@ -126,3 +190,16 @@ http://127.0.0.1:3000/settings
 Save the server URL and token. The dashboard stores that runtime connection in
 browser local storage and then probes `/api/health` plus `/api/users/current` to
 show the active user.
+
+## Configure Menubar
+
+The macOS menubar app stores its own runtime connection in UserDefaults. Its
+server URL and token are independent from the dashboard and agent hook settings.
+
+## Configuration Boundaries
+
+Agent hooks, dashboard, menubar, and server deployment each keep their own
+connection settings. Changing the dashboard URL/token does not update existing
+hooks, and changing a hook settings file does not update dashboard or menubar
+clients. When moving between local FastAPI, LAN, and Worker deployments, update
+all active surfaces that should point at the new server.

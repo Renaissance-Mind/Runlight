@@ -18,8 +18,10 @@ bash install.sh --server http://127.0.0.1:8766
 bash install.sh --uninstall
 ```
 
-## Why a manual install step?
+## Why keep a manual install step?
 
-Claude Code's plugin system auto-loads **skills** but does not auto-register
-**hooks** from `hooks.json`. Hooks must be written directly into
-`~/.claude/settings.json`. The install script handles this merge.
+The plugin manifest declares the hook inventory for clients that support plugin
+hook metadata. The install script remains the reliable path for local use: it
+writes hooks directly into `~/.claude/settings.json`, stores server/token options
+under `pluginConfigs`, and marks hook calls async so monitoring cannot block
+Claude Code.

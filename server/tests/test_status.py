@@ -28,6 +28,16 @@ class TestStatusEngine:
         old = datetime.now(timezone.utc) - timedelta(seconds=300)
         assert infer_status("message.finished", None, last_event_at=old) == "finished"
 
+    def test_completed_action_quiet_is_finished_not_stale(self):
+        old = datetime.now(timezone.utc) - timedelta(seconds=300)
+        assert infer_status("tool.finished", None, last_event_at=old) == "finished"
+        assert infer_status("command.finished", None, last_event_at=old) == "finished"
+
+    def test_started_action_quiet_is_stale(self):
+        old = datetime.now(timezone.utc) - timedelta(seconds=300)
+        assert infer_status("tool.started", None, last_event_at=old) == "stale"
+        assert infer_status("command.started", None, last_event_at=old) == "stale"
+
     def test_waiting_user(self):
         assert infer_status("user_input.waiting", None) == "waiting_user"
 

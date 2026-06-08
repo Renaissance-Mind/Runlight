@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --surface-0: 248 249 250;
+  --surface-1: 255 255 255;
+  --surface-2: 240 241 243;
+  --surface-3: 224 226 230;
+  --text-primary: 26 26 46;
+  --text-secondary: 107 114 128;
+  --text-muted: 156 163 175;
+}
+
+.dark {
+  --surface-0: 10 10 15;
+  --surface-1: 18 18 26;
+  --surface-2: 26 26 37;
+  --surface-3: 34 34 48;
+  --text-primary: 243 244 246;
+  --text-secondary: 156 163 175;
+  --text-muted: 107 114 128;
+}
+
 .pet-sprite-frame {
   --pet-scale: 1;
   width: calc(192px * var(--pet-scale));
@@ -48,6 +68,34 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background: rgb(var(--surface-0));
+  color: rgb(var(--text-primary));
+}
+
+html:not(.dark) .text-white,
+html:not(.dark) .text-gray-200,
+html:not(.dark) .text-gray-300 {
+  color: rgb(var(--text-primary)) !important;
+}
+html:not(.dark) .text-gray-400 {
+  color: rgb(var(--text-secondary)) !important;
+}
+html:not(.dark) .text-gray-500,
+html:not(.dark) .text-gray-600 {
+  color: rgb(var(--text-muted)) !important;
+}
+html:not(.dark) .hover\:text-white:hover {
+  color: rgb(var(--text-primary)) !important;
+}
+html:not(.dark) select,
+html:not(.dark) input {
+  color: rgb(var(--text-primary)) !important;
+}
+html:not(.dark) .bg-gray-500 {
+  background-color: rgb(156 163 175) !important;
+}
+html:not(.dark) .bg-gray-600 {
+  background-color: rgb(107 114 128) !important;
 }
 
 ::-webkit-scrollbar {
@@ -58,6 +106,6 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: rgb(var(--surface-3));
   border-radius: 3px;
 }

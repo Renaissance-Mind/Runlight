@@ -36,18 +36,31 @@ _jq() {
 
 HOOK_EVENT="$(_jq '.hook_event_name')"
 SESSION_ID="$(_jq '.session_id')"
+TRANSCRIPT_PATH="$(_jq '.transcript_path')"
 TOOL_NAME="$(_jq '.tool_name')"
 CWD="$(_jq '.cwd')"
 MODEL="$(_jq '.model')"
 
 [ -z "$SESSION_ID" ] && exit 0
 
-_auth_header=""
-[ -n "$AGENT_MONITOR_TOKEN" ] && _auth_header="-H \"Authorization: Bearer $AGENT_MONITOR_TOKEN\""
-
 _sql_escape() {
   printf "%s" "$1" | sed "s/'/''/g"
 }
+
+_session_id_exists_in_codex_state() {
+  if [ -f "$CODEX_STATE_DB" ] && command -v sqlite3 &>/dev/null; then
+    local sid_sql found
+    sid_sql="$(_sql_escape "$SESSION_ID")"
+    found="$(sqlite3 "$CODEX_STATE_DB" "SELECT 1 FROM threads WHERE id = '${sid_sql}' LIMIT 1;" 2>/dev/null)"
+    [ "$found" = "1" ]
+    return $?
+  fi
+  return 1
+}
+
+if [ -z "$TRANSCRIPT_PATH" ] && ! _session_id_exists_in_codex_state; then
+  exit 0
+fi
 
 _clean_session_name() {
   printf "%s" "$1" | tr '\r' '\n' | sed '/^[[:space:]]*$/d' | head -1 | cut -c1-240
@@ -109,8 +122,10 @@ _send_event() {
   branch_val="$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
   local commit_val
   commit_val="$(git -C "$CWD" rev-parse --short HEAD 2>/dev/null || echo "")"
+  local repo_root
+  repo_root="$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null || echo "")"
   local project_val
-  project_val="$(basename "$CWD" 2>/dev/null || echo "")"
+  project_val="$(basename "${repo_root:-$CWD}" 2>/dev/null || echo "")"
 
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -129,6 +144,7 @@ _send_event() {
     --arg arch "$arch_val" \
     --arg usr "$user_val" \
     --arg cwd "$CWD" \
+    --arg rr "$repo_root" \
     --arg br "$branch_val" \
     --arg cm "$commit_val" \
     --arg pn "$project_val" \
@@ -145,7 +161,7 @@ _send_event() {
       severity: $sev,
       summary: $sum,
       machine: {hostname: $hn, os: $os, arch: $arch, user: $usr},
-      workspace: {cwd: $cwd, git_branch: $br, git_commit: $cm, project_name: $pn},
+      workspace: {cwd: $cwd, repo_root: $rr, git_branch: $br, git_commit: $cm, project_name: $pn},
       payload: $payload
     }' 2>/dev/null) || return 0
 

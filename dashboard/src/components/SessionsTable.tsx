@@ -12,9 +12,13 @@ const PROJECT_ORDER_STORAGE_KEY = "agent-monitor.dashboard.project-order.v1";
 const COLLAPSED_PROJECTS_STORAGE_KEY =
   "agent-monitor.dashboard.collapsed-projects.v1";
 
+function parseUTC(isoStr: string): number {
+  return new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
+}
+
 function timeAgo(isoStr: string | null): string {
   if (!isoStr) return "-";
-  const ms = Date.now() - new Date(isoStr).getTime();
+  const ms = Date.now() - parseUTC(isoStr);
   const sec = Math.floor(ms / 1000);
   if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
@@ -24,10 +28,27 @@ function timeAgo(isoStr: string | null): string {
   return `${Math.floor(hr / 24)}d`;
 }
 
+function lastUpdate(isoStr: string | null): string {
+  if (!isoStr) return "-";
+  const ms = Date.now() - parseUTC(isoStr);
+  const sec = Math.floor(ms / 1000);
+  const threeDays = 3 * 24 * 60 * 60;
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < threeDays) {
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    return `${Math.floor(hr / 24)}d ago`;
+  }
+  const d = new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z");
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 function duration(startedAt: string | null, lastEventAt: string | null): string {
   if (!startedAt) return "-";
-  const end = lastEventAt ? new Date(lastEventAt).getTime() : Date.now();
-  const ms = end - new Date(startedAt).getTime();
+  const end = lastEventAt ? parseUTC(lastEventAt) : Date.now();
+  const ms = end - parseUTC(startedAt);
   const sec = Math.floor(ms / 1000);
   if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
@@ -109,7 +130,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
     () => new Set(collapsedProjects),
     [collapsedProjects],
   );
-  const columnCount = 10;
+  const columnCount = 11;
 
   const toggleProject = (projectName: string) => {
     setCollapsedProjects((previousProjects) => {
@@ -167,6 +188,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
             <th className="px-3 py-2">Path</th>
             <th className="px-3 py-2">Branch</th>
             <th className="px-3 py-2">Event</th>
+            <th className="px-3 py-2 text-right">Updated</th>
             <th className="px-3 py-2 text-right">HB</th>
             <th className="px-3 py-2 text-right">Dur</th>
           </tr>
@@ -192,7 +214,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                       >
                         {isCollapsed ? ">" : "v"}
                       </button>
-                      <span className="truncate text-[10px] font-semibold uppercase text-gray-400">
+                      <span className="truncate text-xs font-semibold text-gray-400">
                         {group.projectName}
                       </span>
                       <span className="shrink-0 text-[10px] text-gray-600">
@@ -269,6 +291,9 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                     </td>
                     <td className="px-3 py-2 text-gray-400">
                       {s.latest_event_type || "-"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-400">
+                      {lastUpdate(s.last_event_at)}
                     </td>
                     <td className="px-3 py-2 text-right text-gray-400">
                       {timeAgo(s.last_heartbeat_at)}

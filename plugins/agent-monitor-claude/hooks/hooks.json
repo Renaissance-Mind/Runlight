@@ -6,7 +6,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -17,7 +18,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -28,7 +30,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -39,7 +42,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -50,7 +54,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -61,7 +66,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -72,7 +78,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -83,7 +90,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -94,7 +102,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -105,7 +114,8 @@
           {
             "type": "command",
             "command": "AGENT_MONITOR_SERVER_URL=\"${user_config.server_url}\" AGENT_MONITOR_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/agent-monitor-hook.sh\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }

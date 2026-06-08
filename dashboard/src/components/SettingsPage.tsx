@@ -6,6 +6,7 @@ import {
   formatConnectionStatus,
   normalizeSettingsDraft,
 } from "../api/settingsModel";
+import { getEffectiveTheme, type DashboardPreferences, type Theme } from "../api/preferences";
 
 function statusToneClass(tone: "ok" | "muted" | "error"): string {
   switch (tone) {
@@ -21,13 +22,18 @@ function statusToneClass(tone: "ok" | "muted" | "error"): string {
 export default function SettingsPage({
   config,
   probe,
+  prefs,
   onSave,
+  onSavePrefs,
 }: {
   config: DashboardConnectionConfig;
   probe: ServerConnectionProbe | null;
+  prefs: DashboardPreferences;
   onSave: (config: DashboardConnectionConfig) => void;
+  onSavePrefs: (prefs: DashboardPreferences) => void;
 }) {
   const [draft, setDraft] = useState(config);
+  const [prefsDraft, setPrefsDraft] = useState(prefs);
   const [saved, setSaved] = useState(false);
   const status = formatConnectionStatus(probe);
 
@@ -35,6 +41,7 @@ export default function SettingsPage({
     const next = normalizeSettingsDraft(draft);
     setDraft(next);
     onSave(next);
+    onSavePrefs(prefsDraft);
     setSaved(true);
   };
 
@@ -101,6 +108,70 @@ export default function SettingsPage({
               Save
             </button>
           </div>
+        </div>
+
+        <div className="border border-surface-3 bg-surface-1 rounded-lg p-4 space-y-4 mt-4">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 tracking-wider">
+            Display
+          </h2>
+
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase text-gray-500 tracking-wider">
+              Theme
+            </span>
+            <select
+              value={prefsDraft.theme}
+              onChange={(e) => {
+                const next = e.currentTarget.value as Theme;
+                setSaved(false);
+                setPrefsDraft({ ...prefsDraft, theme: next });
+                document.documentElement.classList.toggle("dark", getEffectiveTheme(next) === "dark");
+              }}
+              className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm"
+            >
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="system">System</option>
+            </select>
+          </label>
+
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase text-gray-500 tracking-wider">
+              Hide stale sessions after (hours)
+            </span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={prefsDraft.hideStaleAfterHours}
+              onChange={(e) => {
+                setSaved(false);
+                setPrefsDraft({ ...prefsDraft, hideStaleAfterHours: Math.max(0, Number(e.currentTarget.value)) });
+              }}
+              className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm text-gray-200"
+            />
+          </label>
+
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase text-gray-500 tracking-wider">
+              Hide finished sessions after (hours)
+            </span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={prefsDraft.hideFinishedAfterHours}
+              onChange={(e) => {
+                setSaved(false);
+                setPrefsDraft({ ...prefsDraft, hideFinishedAfterHours: Math.max(0, Number(e.currentTarget.value)) });
+              }}
+              className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm text-gray-200"
+            />
+          </label>
+
+          <p className="text-[10px] text-gray-600">
+            Set to 0 to never hide. Pinned sessions are always shown.
+          </p>
         </div>
       </main>
     </div>

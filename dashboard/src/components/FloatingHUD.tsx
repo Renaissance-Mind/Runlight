@@ -34,7 +34,7 @@ export default function FloatingHUD({ sessions }: Props) {
   }, []);
 
   return (
-    <div className="bg-surface-2 border border-surface-3 rounded-lg px-4 py-3 shadow-xl">
+    <div className="bg-surface-2 border border-surface-3 rounded-lg px-4 py-3 shadow-sm">
       <div className="flex items-center gap-4">
         {petAsset && (
           <div className="shrink-0 rounded-md border border-surface-3 bg-surface-1/60 px-1.5 pt-1.5">

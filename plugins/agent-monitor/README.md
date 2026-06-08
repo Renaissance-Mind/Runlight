@@ -16,3 +16,13 @@ codex plugin add agent-monitor@agent-monitor-local
 ```
 
 Start a new Codex thread after installation so the bundled skill is loaded.
+
+Then run the bundled installer from the installed skill to write lifecycle hooks
+into `$CODEX_HOME/hooks.json` or `~/.codex/hooks.json`:
+
+```bash
+bash ~/.codex/plugins/cache/agent-monitor-local/agent-monitor/0.1.0/skills/agent-monitor/scripts/install-codex-hook.sh
+```
+
+Plugin installation makes the AgentMonitor skill available; hook installation is
+the step that starts event collection.

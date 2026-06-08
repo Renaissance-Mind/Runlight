@@ -11,11 +11,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK_SCRIPT="${SCRIPT_DIR}/agent-monitor-hook.sh"
 SETTINGS_FILE="${SCRIPT_DIR}/settings.json"
-CODEX_HOOKS_JSON="${HOME}/.codex/hooks.json"
+CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
+CODEX_HOOKS_JSON="${CODEX_HOME_DIR}/hooks.json"
 
+mkdir -p "$CODEX_HOME_DIR"
 if [ ! -f "$CODEX_HOOKS_JSON" ]; then
-  echo "Error: ${CODEX_HOOKS_JSON} not found. Is Codex installed?"
-  exit 1
+  jq -n '{hooks: {}}' > "$CODEX_HOOKS_JSON"
 fi
 
 if ! command -v jq &>/dev/null; then

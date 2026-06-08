@@ -2,7 +2,8 @@
 # Remove AgentMonitor hooks from Codex hooks.json
 set -e
 
-CODEX_HOOKS_JSON="${HOME}/.codex/hooks.json"
+CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
+CODEX_HOOKS_JSON="${CODEX_HOME_DIR}/hooks.json"
 
 if [ ! -f "$CODEX_HOOKS_JSON" ]; then
   echo "No hooks.json found"

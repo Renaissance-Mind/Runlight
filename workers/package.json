@@ -1,0 +1,26 @@
+{
+  "name": "agent-monitor-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run test && npm run typecheck",
+    "deploy:check": "node scripts/validate-wrangler.mjs",
+    "predeploy": "npm run deploy:check",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create agent-monitor-db",
+    "db:migrate": "wrangler d1 migrations apply agent-monitor-db",
+    "db:migrate:local": "wrangler d1 migrations apply agent-monitor-db --local"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250601.0",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.19.0"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  }
+}

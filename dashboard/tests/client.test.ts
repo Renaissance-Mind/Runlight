@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { after, before, describe, it } from "node:test";
 
 import {
+  deleteSession,
   fetchCurrentUser,
   probeServerConnection,
 } from "../src/api/client.ts";
@@ -21,6 +22,11 @@ const server = createServer((req, res) => {
 
   if (req.url === "/api/users/current") {
     res.end(JSON.stringify({ user_id: lastAuthorization ? "user-alice" : "default" }));
+    return;
+  }
+
+  if (req.url === "/api/sessions/sess-delete" && req.method === "DELETE") {
+    res.end(JSON.stringify({ deleted: "sess-delete" }));
     return;
   }
 
@@ -62,5 +68,11 @@ describe("dashboard runtime API client", () => {
     assert.equal(probe.tokenConfigured, false);
     assert.equal(typeof probe.checkedAt, "string");
     assert.equal(probe.error, null);
+  });
+
+  it("deletes a session with the configured token", async () => {
+    await deleteSession("sess-delete", { serverUrl, token: "tok-user-1" });
+
+    assert.equal(lastAuthorization, "Bearer tok-user-1");
   });
 });

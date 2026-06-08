@@ -2,7 +2,7 @@
 # Remove AgentMonitor hooks from Claude Code settings.json
 set -e
 
-CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
+CLAUDE_SETTINGS="${CLAUDE_SETTINGS_FILE:-${HOME}/.claude/settings.json}"
 
 if [ ! -f "$CLAUDE_SETTINGS" ]; then
   echo "No settings.json found"

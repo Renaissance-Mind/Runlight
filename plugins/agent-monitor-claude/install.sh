@@ -15,6 +15,7 @@ SETTINGS_FILE="${CLAUDE_SETTINGS_FILE:-$HOME/.claude/settings.json}"
 HOOK_SCRIPT="$PLUGIN_DIR/scripts/agent-monitor-hook.sh"
 DEFAULT_SERVER="http://127.0.0.1:8766"
 MARKER="agent-monitor-hook.sh"
+PLUGIN_CONFIG_KEY="${AGENT_MONITOR_CLAUDE_PLUGIN_CONFIG_KEY:-agent-monitor@agent-monitor-local}"
 
 SERVER_URL=""
 TOKEN=""
@@ -82,6 +83,7 @@ SETTINGS = "$SETTINGS_FILE"
 HOOK_SCRIPT = "$HOOK_SCRIPT"
 SERVER_URL = "$SERVER_URL" or "$DEFAULT_SERVER"
 TOKEN = "$TOKEN"
+PLUGIN_CONFIG_KEY = "$PLUGIN_CONFIG_KEY"
 
 with open(SETTINGS) as f:
     settings = json.load(f)
@@ -104,7 +106,7 @@ settings["hooks"] = hooks
 
 # Store config in pluginConfigs (hook reads from here at runtime)
 pc = settings.setdefault("pluginConfigs", {})
-opts = pc.setdefault("agent-monitor@agent-monitor-local", {}).setdefault("options", {})
+opts = pc.setdefault(PLUGIN_CONFIG_KEY, {}).setdefault("options", {})
 opts["server_url"] = SERVER_URL
 if TOKEN:
     opts["token"] = TOKEN

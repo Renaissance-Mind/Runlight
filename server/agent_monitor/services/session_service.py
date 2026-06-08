@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_monitor.db.models import Session
+from agent_monitor.db.models import Event, Session
 from agent_monitor.protocol import EventEnvelope, TERMINAL_EVENT_TYPES
 from agent_monitor.services.status_engine import infer_status
 
@@ -144,3 +144,8 @@ async def get_session_by_id(db: AsyncSession, session_id: str) -> Session | None
         select(Session).where(Session.session_id == session_id)
     )
     return result.scalar_one_or_none()
+
+
+async def delete_session(db: AsyncSession, session_id: str) -> None:
+    await db.execute(delete(Event).where(Event.session_id == session_id))
+    await db.execute(delete(Session).where(Session.session_id == session_id))

@@ -11,11 +11,19 @@ _trim() {
 if [ -z "${AGENT_MONITOR_SERVER_URL:-}" ] || [ -z "${AGENT_MONITOR_TOKEN:-}" ]; then
   _SETTINGS="$HOME/.claude/settings.json"
   if [ -f "$_SETTINGS" ] && command -v jq >/dev/null 2>&1; then
-    _PC='.pluginConfigs["agent-monitor@agent-monitor-local"].options'
+    _PC='
+      (.pluginConfigs // {}) as $pc
+      | (
+          $pc["agent-monitor@agent-monitor-local"].options
+          // $pc["agent-monitor"].options
+          // ([ $pc | to_entries[] | select(.key | test("agent-monitor")) | .value.options ][0])
+          // {}
+        )
+    '
     [ -z "${AGENT_MONITOR_SERVER_URL:-}" ] && \
-      AGENT_MONITOR_SERVER_URL="$(jq -r "$_PC.server_url // empty" "$_SETTINGS" 2>/dev/null || echo "")"
+      AGENT_MONITOR_SERVER_URL="$(jq -r "${_PC} | .server_url // empty" "$_SETTINGS" 2>/dev/null || echo "")"
     [ -z "${AGENT_MONITOR_TOKEN:-}" ] && \
-      AGENT_MONITOR_TOKEN="$(jq -r "$_PC.token // empty" "$_SETTINGS" 2>/dev/null || echo "")"
+      AGENT_MONITOR_TOKEN="$(jq -r "${_PC} | .token // empty" "$_SETTINGS" 2>/dev/null || echo "")"
   fi
 fi
 
@@ -51,7 +59,9 @@ _send_event() {
   user_val="$(whoami 2>/dev/null || echo unknown)"
   branch_val="$(git -C "${CWD:-.}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
   commit_val="$(git -C "${CWD:-.}" rev-parse --short HEAD 2>/dev/null || echo "")"
-  project_val="$(basename "${CWD:-.}" 2>/dev/null || echo "")"
+  local repo_root
+  repo_root="$(git -C "${CWD:-.}" rev-parse --show-toplevel 2>/dev/null || echo "")"
+  project_val="$(basename "${repo_root:-${CWD:-.}}" 2>/dev/null || echo "")"
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   local json
@@ -66,6 +76,7 @@ _send_event() {
     --arg arch "$arch_val" \
     --arg usr "$user_val" \
     --arg cwd "${CWD:-.}" \
+    --arg rr "$repo_root" \
     --arg br "$branch_val" \
     --arg cm "$commit_val" \
     --arg pn "$project_val" \
@@ -80,7 +91,7 @@ _send_event() {
       severity: $sev,
       summary: $sum,
       machine: {hostname: $hn, os: $os, arch: $arch, user: $usr},
-      workspace: {cwd: $cwd, git_branch: $br, git_commit: $cm, project_name: $pn},
+      workspace: {cwd: $cwd, repo_root: $rr, git_branch: $br, git_commit: $cm, project_name: $pn},
       payload: $payload
     }' 2>/dev/null) || return 0
 

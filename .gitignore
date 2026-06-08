@@ -34,10 +34,15 @@ Thumbs.db
 node_modules/
 npm-debug.log*
 dashboard/tsconfig.tsbuildinfo
+workers/node_modules/
+workers/dist/
 
 # Tauri
 dashboard/src-tauri/target/
 dashboard/src-tauri/gen/
+
+# SwiftPM
+menubar/.build/
 
 # Env
 .env

@@ -50,7 +50,16 @@ def infer_status(
     if stale_reference:
         age = (datetime.now(timezone.utc) - _as_utc(stale_reference)).total_seconds()
         if age > settings.heartbeat_stale_seconds:
-            return "stale"
+            # "stale" means an agent stopped responding mid-flight. When
+            # heartbeats are being sent, a gap proves that. Without heartbeats
+            # we infer from the last event: an action that started but never
+            # completed looks stuck (stale); a completed action means the turn
+            # ended cleanly and the session is just idle (finished).
+            if last_heartbeat_at is not None or (
+                latest_event_type and latest_event_type.endswith(".started")
+            ):
+                return "stale"
+            return "finished"
 
     if active_started_types:
         if any("command" in t for t in active_started_types):

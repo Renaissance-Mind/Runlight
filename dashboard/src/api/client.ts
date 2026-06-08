@@ -84,6 +84,15 @@ export async function fetchSessionEvents(
   return data.events;
 }
 
+export async function deleteSession(
+  sessionId: string,
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<void> {
+  await fetchJSON<{ deleted: string }>(config, `/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchHealth(
   config: DashboardConnectionConfig = defaultConfig,
 ): Promise<{ status: string; service?: string }> {

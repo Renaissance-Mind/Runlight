@@ -112,3 +112,5 @@ class TestDeduplication:
         await client.post("/api/events", json=ev)
         resp = await client.get("/api/sessions/sess-dedup/events")
         assert len(resp.json()["events"]) == 1
+        session_resp = await client.get("/api/sessions/sess-dedup")
+        assert session_resp.json()["event_count"] == 1

@@ -12,14 +12,16 @@ from agent_monitor.db.models import Event
 from agent_monitor.protocol import EventEnvelope
 
 
-async def store_event(db: AsyncSession, envelope: EventEnvelope, user_id: str) -> Event:
+async def store_event(
+    db: AsyncSession, envelope: EventEnvelope, user_id: str
+) -> tuple[Event, bool]:
     if envelope.dedupe_key:
         existing = await db.execute(
             select(Event).where(Event.dedupe_key == envelope.dedupe_key)
         )
         found = existing.scalar_one_or_none()
         if found:
-            return found
+            return found, False
 
     event = Event(
         event_id=envelope.event_id,
@@ -42,7 +44,7 @@ async def store_event(db: AsyncSession, envelope: EventEnvelope, user_id: str) -
         dedupe_key=envelope.dedupe_key,
     )
     db.add(event)
-    return event
+    return event, True
 
 
 async def get_events_for_session(
