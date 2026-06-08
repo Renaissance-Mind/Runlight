@@ -33,13 +33,13 @@ function lastUpdate(isoStr: string | null): string {
   const ms = Date.now() - parseUTC(isoStr);
   const sec = Math.floor(ms / 1000);
   const threeDays = 3 * 24 * 60 * 60;
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return `${sec}s`;
   if (sec < threeDays) {
     const min = Math.floor(sec / 60);
-    if (min < 60) return `${min}m ago`;
+    if (min < 60) return `${min}m`;
     const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr}h ago`;
-    return `${Math.floor(hr / 24)}d ago`;
+    if (hr < 24) return `${hr}h`;
+    return `${Math.floor(hr / 24)}d`;
   }
   const d = new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z");
   return `${d.getMonth() + 1}/${d.getDate()}`;
@@ -181,7 +181,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
         <thead>
           <tr className="text-gray-500 border-b border-surface-3 text-left">
             <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2 text-right">Updated</th>
+            <th className="whitespace-nowrap px-3 py-2 text-right">Updated</th>
             <th className="px-3 py-2">Pin</th>
             <th className="px-3 py-2">Agent</th>
             <th className="px-3 py-2">Session</th>
@@ -255,7 +255,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                     <td className="px-3 py-2">
                       <StatusBadge status={s.current_status} />
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-400">
+                    <td className="whitespace-nowrap px-3 py-2 text-right text-gray-400">
                       {lastUpdate(s.last_event_at)}
                     </td>
                     <td className="px-3 py-2">
