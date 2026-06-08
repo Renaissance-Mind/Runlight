@@ -180,7 +180,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
       <table className="w-full text-xs">
         <thead>
           <tr className="text-gray-500 border-b border-surface-3 text-left">
-            <th className="px-3 py-2">Status</th>
+            <th className="w-12 px-3 py-2 text-center">Status</th>
             <th className="whitespace-nowrap px-3 py-2 text-right">Updated</th>
             <th className="px-3 py-2">Pin</th>
             <th className="px-3 py-2">Agent</th>
@@ -252,8 +252,12 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                     key={s.session_id}
                     className="border-b border-surface-3/50 hover:bg-surface-2/50 transition-colors"
                   >
-                    <td className="px-3 py-2">
-                      <StatusBadge status={s.current_status} />
+                    <td className="px-3 py-2 text-center">
+                      <StatusBadge
+                        status={s.current_status}
+                        lastEventAt={s.last_event_at}
+                        showLabel={false}
+                      />
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-gray-400">
                       {lastUpdate(s.last_event_at)}

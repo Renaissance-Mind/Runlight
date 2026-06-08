@@ -4,14 +4,29 @@ import type { Session } from "../types/session";
 import { buildPetSurfaceSnapshot } from "../api/petSurface";
 import { loadDashboardPetAsset, type DashboardPetAsset } from "../api/petAssets";
 import { petStateFromSurface } from "../api/petSpriteState";
+import {
+  getStatusPresentationForTone,
+  summarizeStatusPresentationCounts,
+  type StatusTone,
+} from "../api/statusPresentation";
 import { PetSprite } from "./pet/PetSprite";
 
 interface Props {
   sessions: Session[];
 }
 
+const COUNTER_TONES: StatusTone[] = [
+  "running",
+  "recent_finished",
+  "finished",
+  "stale",
+  "failed",
+  "waiting",
+];
+
 export default function FloatingHUD({ sessions }: Props) {
   const surface = buildPetSurfaceSnapshot(sessions);
+  const statusCounts = summarizeStatusPresentationCounts(sessions);
   const petState = petStateFromSurface(surface);
   const [petAsset, setPetAsset] = useState<DashboardPetAsset | null>(null);
   const [petLoadError, setPetLoadError] = useState<string | null>(null);
@@ -47,32 +62,16 @@ export default function FloatingHUD({ sessions }: Props) {
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-4 text-xs">
-            <HUDCounter
-              label="Running"
-              count={surface.counts.running}
-              color="text-accent-green"
-            />
-            <HUDCounter
-              label="Finished"
-              count={surface.counts.finished}
-              color="text-accent-blue"
-            />
-            <HUDCounter
-              label="Stale"
-              count={surface.counts.stale}
-              color="text-accent-yellow"
-            />
-            <HUDCounter
-              label="Failed"
-              count={surface.counts.failed}
-              color="text-accent-red"
-            />
-            <HUDCounter
-              label="Waiting"
-              count={surface.counts.waiting}
-              color="text-accent-orange"
-            />
+          <div
+            className="flex items-center gap-4 text-xs"
+            aria-label="Session status counts"
+          >
+            {COUNTER_TONES.map((tone) => (
+              <HUDCounter key={tone} tone={tone} count={statusCounts[tone]} />
+            ))}
+            {statusCounts.unknown > 0 && (
+              <HUDCounter tone="unknown" count={statusCounts.unknown} />
+            )}
           </div>
           {surface.latest && (
             <div className="mt-2 truncate text-[10px] text-gray-500">
@@ -91,20 +90,32 @@ export default function FloatingHUD({ sessions }: Props) {
 }
 
 function HUDCounter({
-  label,
+  tone,
   count,
-  color,
 }: {
-  label: string;
+  tone: StatusTone;
   count: number;
-  color: string;
 }) {
+  const presentation = getStatusPresentationForTone(tone);
+
   return (
-    <div className="text-center">
-      <div className={`text-lg font-bold ${count > 0 ? color : "text-gray-600"}`}>
+    <div
+      className="flex items-center gap-1.5"
+      title={`${presentation.label}: ${count}`}
+      aria-label={`${presentation.label}: ${count}`}
+    >
+      <span
+        className={`h-2 w-2 rounded-full ${presentation.dotClass} ${
+          count > 0 ? "" : "opacity-30"
+        }`}
+      />
+      <div
+        className={`text-lg font-bold leading-none tabular-nums ${
+          count > 0 ? presentation.textClass : "text-gray-600"
+        }`}
+      >
         {count}
       </div>
-      <div className="text-gray-500">{label}</div>
     </div>
   );
 }

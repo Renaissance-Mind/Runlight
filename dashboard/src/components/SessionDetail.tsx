@@ -135,7 +135,11 @@ export default function SessionDetail({
         >
           &larr; Back
         </Link>
-        <StatusBadge status={session.current_status} size="md" />
+        <StatusBadge
+          status={session.current_status}
+          lastEventAt={session.last_event_at}
+          size="md"
+        />
         <h2 className="text-sm font-medium text-white truncate">
           {session.session_name || session.summary || session.session_id}
         </h2>
