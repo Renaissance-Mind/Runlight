@@ -181,6 +181,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
         <thead>
           <tr className="text-gray-500 border-b border-surface-3 text-left">
             <th className="px-3 py-2">Status</th>
+            <th className="px-3 py-2 text-right">Updated</th>
             <th className="px-3 py-2">Pin</th>
             <th className="px-3 py-2">Agent</th>
             <th className="px-3 py-2">Session</th>
@@ -188,7 +189,6 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
             <th className="px-3 py-2">Path</th>
             <th className="px-3 py-2">Branch</th>
             <th className="px-3 py-2">Event</th>
-            <th className="px-3 py-2 text-right">Updated</th>
             <th className="px-3 py-2 text-right">HB</th>
             <th className="px-3 py-2 text-right">Dur</th>
           </tr>
@@ -255,6 +255,9 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                     <td className="px-3 py-2">
                       <StatusBadge status={s.current_status} />
                     </td>
+                    <td className="px-3 py-2 text-right text-gray-400">
+                      {lastUpdate(s.last_event_at)}
+                    </td>
                     <td className="px-3 py-2">
                       <span
                         className={
@@ -291,9 +294,6 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                     </td>
                     <td className="px-3 py-2 text-gray-400">
                       {s.latest_event_type || "-"}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-400">
-                      {lastUpdate(s.last_event_at)}
                     </td>
                     <td className="px-3 py-2 text-right text-gray-400">
                       {timeAgo(s.last_heartbeat_at)}
