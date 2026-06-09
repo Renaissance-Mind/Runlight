@@ -7,6 +7,7 @@ import {
   moveProjectInOrder,
 } from "../api/viewModels";
 import StatusBadge from "./StatusBadge";
+import AgentIcon from "./AgentIcon";
 
 const PROJECT_ORDER_STORAGE_KEY = "agent-monitor.dashboard.project-order.v1";
 const COLLAPSED_PROJECTS_STORAGE_KEY =
@@ -177,7 +178,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+      <table className="w-full text-xs whitespace-nowrap">
         <thead>
           <tr className="text-gray-500 border-b border-surface-3 text-left">
             <th className="w-12 px-3 py-2 text-center">Status</th>
@@ -272,7 +273,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <span className="text-accent-blue">{s.agent_type}</span>
+                      <AgentIcon agentType={s.agent_type} />
                     </td>
                     <td className="px-3 py-2 max-w-xs truncate">
                       <Link

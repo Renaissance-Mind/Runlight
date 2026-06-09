@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Routes, Route } from "react-router-dom";
+import { Link, NavLink, Routes, Route } from "react-router-dom";
 import { useLiveSessions } from "./hooks/useSessions";
 import { useServerConnection } from "./hooks/useServerConnection";
 import SessionsTable from "./components/SessionsTable";
 import SessionDetail from "./components/SessionDetail";
 import FloatingHUD from "./components/FloatingHUD";
 import SettingsPage from "./components/SettingsPage";
+import MessagesPage from "./components/MessagesPage";
 import {
   readStoredDashboardConfig,
   resolveDashboardConfig,
@@ -21,6 +22,14 @@ import {
   type DashboardPreferences,
 } from "./api/preferences";
 import type { Session } from "./types/session";
+
+function navLinkClass({ isActive }: { isActive: boolean }): string {
+  return `text-xs px-2 py-1 rounded transition-colors ${
+    isActive
+      ? "text-white bg-surface-2"
+      : "text-gray-500 hover:text-white hover:bg-surface-2"
+  }`;
+}
 
 function ConnectionStatus({ probe }: { probe: ServerConnectionProbe | null }) {
   const status = formatConnectionStatus(probe);
@@ -114,17 +123,28 @@ export default function App() {
 
   return (
     <>
-      <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-end gap-3">
-        <ConnectionStatus probe={probe} />
-        <Link
-          to="/settings"
-          className="text-xs text-gray-500 hover:text-white dark:hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
-        >
-          Settings
-        </Link>
+      <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between gap-3">
+        <nav className="flex items-center gap-1">
+          <NavLink to="/" end className={navLinkClass}>
+            Live
+          </NavLink>
+          <NavLink to="/messages" className={navLinkClass}>
+            Messages
+          </NavLink>
+        </nav>
+        <div className="flex items-center gap-3">
+          <ConnectionStatus probe={probe} />
+          <Link
+            to="/settings"
+            className="text-xs text-gray-500 hover:text-white dark:hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
+          >
+            Settings
+          </Link>
+        </div>
       </header>
       <Routes>
         <Route path="/" element={<Dashboard config={config} prefs={prefs} />} />
+        <Route path="/messages" element={<MessagesPage config={config} />} />
         <Route
           path="/sessions/:sessionId"
           element={

@@ -84,6 +84,17 @@ export async function fetchSessionEvents(
   return data.events;
 }
 
+export async function fetchRecentEvents(
+  config: DashboardConnectionConfig = defaultConfig,
+  limit = 100,
+): Promise<SessionEvent[]> {
+  const data = await fetchJSON<{ events: SessionEvent[] }>(
+    config,
+    `/events/recent?limit=${limit}`,
+  );
+  return data.events;
+}
+
 export async function deleteSession(
   sessionId: string,
   config: DashboardConnectionConfig = defaultConfig,

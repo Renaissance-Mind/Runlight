@@ -60,6 +60,7 @@ class Session(Base):
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime)
     event_count: Mapped[int] = mapped_column(Integer, default=0)
     terminal_result: Mapped[str | None] = mapped_column(String(50))
+    current_run_started_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

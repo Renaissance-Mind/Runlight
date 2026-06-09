@@ -20,6 +20,7 @@ export interface Session {
   last_heartbeat_at: string | null;
   event_count: number;
   terminal_result: string | null;
+  current_run_started_at: string | null;
 }
 
 export interface SessionEvent {
@@ -27,6 +28,7 @@ export interface SessionEvent {
   session_id: string;
   session_name: string | null;
   session_pin: boolean;
+  agent_type: string;
   event_type: string;
   event_time: string | null;
   received_time: string | null;
@@ -34,6 +36,7 @@ export interface SessionEvent {
   summary: string | null;
   machine_hostname: string | null;
   workspace_cwd: string | null;
+  workspace_project_name: string | null;
   payload: Record<string, unknown> | null;
 }
 

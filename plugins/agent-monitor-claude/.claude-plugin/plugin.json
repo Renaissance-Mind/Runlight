@@ -23,7 +23,7 @@
       "title": "AgentMonitor server URL",
       "description": "HTTP endpoint for the AgentMonitor server.",
       "default": "http://127.0.0.1:8766",
-      "required": true
+      "required": false
     },
     "token": {
       "type": "string",

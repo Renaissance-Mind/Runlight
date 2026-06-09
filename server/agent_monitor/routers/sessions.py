@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_monitor.auth import resolve_user
 from agent_monitor.db.session import get_db
-from agent_monitor.services.event_service import get_events_for_session
+from agent_monitor.services.event_service import (
+    COMPLETION_EVENT_TYPES,
+    get_events_for_session,
+    get_recent_events,
+)
 from agent_monitor.services.session_service import (
     delete_session,
     get_all_sessions,
@@ -50,15 +54,17 @@ def _session_dict(s) -> dict:
         "last_heartbeat_at": s.last_heartbeat_at.isoformat() if s.last_heartbeat_at else None,
         "event_count": s.event_count,
         "terminal_result": s.terminal_result,
+        "current_run_started_at": s.current_run_started_at.isoformat() if s.current_run_started_at else None,
     }
 
 
-def _event_dict(e) -> dict:
+def _event_dict(e, *, workspace_project_name: str | None = None) -> dict:
     return {
         "event_id": e.event_id,
         "session_id": e.session_id,
         "session_name": e.session_name,
         "session_pin": e.session_pin,
+        "agent_type": e.agent_type,
         "event_type": e.event_type,
         "event_time": e.event_time.isoformat() if e.event_time else None,
         "received_time": e.received_time.isoformat() if e.received_time else None,
@@ -66,6 +72,7 @@ def _event_dict(e) -> dict:
         "summary": e.summary,
         "machine_hostname": e.machine_hostname,
         "workspace_cwd": e.workspace_cwd,
+        "workspace_project_name": workspace_project_name,
         "payload": json.loads(e.payload_json) if e.payload_json else None,
     }
 
@@ -92,6 +99,19 @@ async def list_sessions(
     await _refresh_statuses(db, user_id)
     sessions = await get_all_sessions(db, user_id, agent_type, status, limit, offset)
     return {"sessions": [_session_dict(s) for s in sessions]}
+
+
+@router.get("/events/recent")
+async def recent_events(
+    limit: int = Query(100, ge=1, le=500),
+    completions_only: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(resolve_user),
+):
+    await _refresh_statuses(db, user_id)
+    event_types = COMPLETION_EVENT_TYPES if completions_only else None
+    rows = await get_recent_events(db, user_id, event_types, limit)
+    return {"events": [_event_dict(e, workspace_project_name=pn) for e, pn in rows]}
 
 
 @router.get("/sessions/{session_id}")

@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_monitor.db.models import Event
+from agent_monitor.db.models import Event, Session
 from agent_monitor.protocol import EventEnvelope
+
+# Events that represent something "finishing" — a turn completing or a
+# session reaching a terminal state. These drive the message log feed.
+COMPLETION_EVENT_TYPES = (
+    "message.finished",
+    "session.completed",
+    "session.failed",
+    "session.aborted",
+)
 
 
 async def store_event(
@@ -57,3 +67,25 @@ async def get_events_for_session(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def get_recent_events(
+    db: AsyncSession,
+    user_id: str,
+    event_types: Sequence[str] | None = None,
+    limit: int = 100,
+) -> list[tuple[Event, str | None]]:
+    """Recent events across all of a user's sessions, newest first.
+
+    Returns (event, workspace_project_name) tuples.
+    """
+    query = (
+        select(Event, Session.workspace_project_name)
+        .join(Session, Event.session_id == Session.session_id, isouter=True)
+        .where(Event.user_id == user_id)
+    )
+    if event_types:
+        query = query.where(Event.event_type.in_(list(event_types)))
+    query = query.order_by(Event.event_time.desc()).limit(limit)
+    result = await db.execute(query)
+    return list(result.tuples().all())
