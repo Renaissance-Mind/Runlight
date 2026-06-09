@@ -112,7 +112,7 @@ For the local repository adapter, edit:
 For the installed Codex plugin, edit:
 
 ```text
-~/.codex/plugins/cache/agent-monitor-local/agent-monitor/0.1.0/skills/agent-monitor/scripts/settings.json
+~/.codex/plugins/cache/agent-monitor-local/agent-monitor/<version>/skills/agent-monitor/scripts/settings.json
 ```
 
 Installing the Codex plugin makes the skill available; it does not itself write
@@ -120,7 +120,8 @@ Codex lifecycle hooks. Run the packaged skill installer after plugin install or
 update:
 
 ```bash
-bash ~/.codex/plugins/cache/agent-monitor-local/agent-monitor/0.1.0/skills/agent-monitor/scripts/install-codex-hook.sh
+AGENT_MONITOR_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/agent-monitor-local/agent-monitor/* | head -1)"
+bash "$AGENT_MONITOR_PLUGIN_DIR/skills/agent-monitor/scripts/install-codex-hook.sh"
 ```
 
 The repository adapter installer is for local development. It writes to

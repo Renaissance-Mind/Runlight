@@ -174,8 +174,8 @@ git commit -m "feat: add dashboard runtime connection probe"
 **Files:**
 - Modify: `adapters/codex-hook/agent-monitor-hook.sh`
 - Modify: `adapters/claude-code-hook/agent-monitor-hook.sh`
-- Modify: `plugins/agent-monitor/skills/agent-monitor/scripts/agent-monitor-hook.sh`
-- Modify: `plugins/agent-monitor/skills/agent-monitor/SKILL.md`
+- Modify: `plugins/agent-monitor-codex/skills/agent-monitor/scripts/agent-monitor-hook.sh`
+- Modify: `plugins/agent-monitor-codex/skills/agent-monitor/SKILL.md`
 - Test: `adapters/python/tests/test_adapter.py`
 
 - [ ] **Step 1: Add a client-side connection contract test**
@@ -207,7 +207,7 @@ Run:
 ```bash
 bash -n adapters/codex-hook/agent-monitor-hook.sh
 bash -n adapters/claude-code-hook/agent-monitor-hook.sh
-bash -n plugins/agent-monitor/skills/agent-monitor/scripts/agent-monitor-hook.sh
+bash -n plugins/agent-monitor-codex/skills/agent-monitor/scripts/agent-monitor-hook.sh
 cd adapters/python && /Users/caopu/miniforge3/bin/python -m pytest tests
 ```
 
