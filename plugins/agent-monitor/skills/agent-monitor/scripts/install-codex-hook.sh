@@ -38,10 +38,35 @@ echo "  Server URL:  ${SERVER_URL}"
 
 HOOK_CMD="bash ${HOOK_SCRIPT}"
 
+prune_agent_monitor_hook() {
+  local event="$1"
+  local tmp
+  tmp=$(mktemp)
+  jq --arg event "$event" '
+    if (.hooks[$event] // null) == null then
+      .
+    else
+      .hooks[$event] = (
+        .hooks[$event]
+        | map(
+            .hooks = (
+              .hooks
+              | map(select((.command // "" | contains("skills/agent-monitor/scripts/agent-monitor-hook.sh")) | not))
+            )
+          )
+        | map(select((.hooks | length) > 0))
+      )
+    end
+  ' "$CODEX_HOOKS_JSON" > "$tmp"
+  mv "$tmp" "$CODEX_HOOKS_JSON"
+}
+
 add_hook() {
   local event="$1"
   local matcher="${2:-}"
   local timeout="${3:-5000}"
+
+  prune_agent_monitor_hook "$event"
 
   local hook_entry
   if [ -n "$matcher" ]; then
