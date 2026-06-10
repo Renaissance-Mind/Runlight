@@ -1,6 +1,6 @@
 {
   "name": "agent-monitor",
-  "version": "0.1.0+codex.20260609110112",
+  "version": "0.1.0+codex.20260610112831",
   "description": "Install and configure AgentMonitor passive observability for Codex sessions.",
   "author": {
     "name": "AgentMonitor"

@@ -35,6 +35,11 @@ AGENT_MONITOR_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/agent-monitor-local/ag
 bash "$AGENT_MONITOR_PLUGIN_DIR/skills/agent-monitor/scripts/install-codex-hook.sh"
 ```
 
+If AgentMonitor does not update after the plugin is installed, check hook
+activation first. The hook installer must have written AgentMonitor entries into
+Codex's hooks file, hooks must be enabled, and the Codex app must trust hooks for
+this workspace in Settings before lifecycle events are emitted.
+
 Plugin installation makes the AgentMonitor skill available; hook installation is
 the step that starts event collection. Re-running the installer replaces older
 AgentMonitor hook entries that point at previous plugin cache paths.
