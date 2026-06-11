@@ -1,11 +1,11 @@
-"""Tests for the Agent Monitor Protocol schema."""
+"""Tests for the Runlight Protocol schema."""
 
 from datetime import datetime, timezone
 
 import pytest
 from pydantic import ValidationError
 
-from agent_monitor.protocol import (
+from runlight.protocol import (
     EventBatch,
     EventEnvelope,
     MachineInfo,

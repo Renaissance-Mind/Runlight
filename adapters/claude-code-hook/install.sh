@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# Install AgentMonitor hook into Claude Code
+# Install Runlight hook into Claude Code
 # Usage: ./install.sh [server_url]
 #
 # Configuration lives in settings.json next to the hook script.
@@ -9,7 +9,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOOK_SCRIPT="${SCRIPT_DIR}/agent-monitor-hook.sh"
+HOOK_SCRIPT="${SCRIPT_DIR}/runlight-hook.sh"
 SETTINGS_FILE="${SCRIPT_DIR}/settings.json"
 CLAUDE_SETTINGS="${CLAUDE_SETTINGS_FILE:-${HOME}/.claude/settings.json}"
 
@@ -37,7 +37,7 @@ fi
 chmod +x "$HOOK_SCRIPT"
 
 SERVER_URL="$(jq -r '.server_url' "$SETTINGS_FILE" 2>/dev/null)"
-echo "Installing AgentMonitor hook for Claude Code..."
+echo "Installing Runlight hook for Claude Code..."
 echo "  Hook script: ${HOOK_SCRIPT}"
 echo "  Settings:    ${SETTINGS_FILE}"
 echo "  Server URL:  ${SERVER_URL}"
@@ -47,9 +47,28 @@ HOOK_CMD="bash ${HOOK_SCRIPT}"
 EVENTS=("SessionStart" "PreToolUse" "PostToolUse" "PostToolUseFailure" "PermissionRequest" "UserPromptSubmit" "SubagentStart" "SubagentStop" "SessionEnd" "Stop")
 
 for event in "${EVENTS[@]}"; do
+  tmp=$(mktemp)
+  jq --arg event "$event" '
+    if (.hooks[$event] // null) == null then
+      .
+    else
+      .hooks[$event] = (
+        .hooks[$event]
+        | map(
+            .hooks = (
+              .hooks
+              | map(select((.command // "" | test("runlight-hook.sh|agent-monitor-hook.sh")) | not))
+            )
+          )
+        | map(select((.hooks | length) > 0))
+      )
+    end
+  ' "$CLAUDE_SETTINGS" > "$tmp"
+  mv "$tmp" "$CLAUDE_SETTINGS"
+
   existing=$(jq -r ".hooks.${event} // [] | .[].hooks[]?.command // empty" "$CLAUDE_SETTINGS" 2>/dev/null)
 
-  if echo "$existing" | grep -q "agent-monitor-hook.sh"; then
+  if echo "$existing" | grep -Eq "runlight-hook.sh|agent-monitor-hook.sh"; then
     echo "  [skip] ${event}: already installed"
     continue
   fi

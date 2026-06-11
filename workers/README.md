@@ -1,6 +1,6 @@
-# AgentMonitor - Cloudflare Workers + D1
+# Runlight - Cloudflare Workers + D1
 
-Serverless deployment of AgentMonitor on Cloudflare. API-compatible with the Python/FastAPI server — just point your dashboard/menubar/hooks to the Worker URL instead.
+Serverless deployment of Runlight on Cloudflare. API-compatible with the Python/FastAPI server — just point your dashboard/menubar/hooks to the Worker URL instead.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ npx wrangler login
 ### 2. Create the D1 Database
 
 ```bash
-npx wrangler d1 create agent-monitor-db
+npx wrangler d1 create runlight-db
 ```
 
 This prints a `database_id`. Copy it and update `wrangler.toml`:
@@ -33,7 +33,7 @@ This prints a `database_id`. Copy it and update `wrangler.toml`:
 ```toml
 [[d1_databases]]
 binding = "DB"
-database_name = "agent-monitor-db"
+database_name = "runlight-db"
 database_id = "YOUR_ACTUAL_DATABASE_ID"
 ```
 
@@ -43,7 +43,7 @@ database id.
 ### 3. Run Database Migration
 
 ```bash
-npx wrangler d1 migrations apply agent-monitor-db --remote
+npx wrangler d1 migrations apply runlight-db --remote
 ```
 
 ### 4. Set Secrets (Optional)
@@ -51,7 +51,7 @@ npx wrangler d1 migrations apply agent-monitor-db --remote
 If you want token-based auth (recommended):
 
 ```bash
-npx wrangler secret put TOKEN_MAP
+npx wrangler secret put RUNLIGHT_TOKEN_MAP
 # Enter value like: mytoken123:myuser,anothertoken:anotheruser
 ```
 
@@ -61,13 +61,14 @@ npx wrangler secret put TOKEN_MAP
 npx wrangler deploy
 ```
 
-Your API is now live at `https://agent-monitor.<your-subdomain>.workers.dev`
+Your API is now live at `https://runlight.<your-subdomain>.workers.dev`
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TOKEN_MAP` | (empty) | `token:user_id` pairs, comma-separated. Set via `wrangler secret put`. |
+| `RUNLIGHT_TOKEN_MAP` | (empty) | `token:user_id` pairs, comma-separated. Set via `wrangler secret put`. |
+| `TOKEN_MAP` | (empty) | Legacy alias for `RUNLIGHT_TOKEN_MAP`. |
 | `HEARTBEAT_STALE_SECONDS` | `120` | Seconds before a session is marked stale |
 | `CORS_ORIGINS` | `*` | Allowed CORS origins, comma-separated |
 
@@ -77,11 +78,11 @@ Point your agent hooks and dashboard to the Worker URL:
 
 ```bash
 # Dashboard / MenuBar
-Server URL: https://agent-monitor.YOUR.workers.dev
+Server URL: https://runlight.YOUR.workers.dev
 
 # Hook adapter
-export AGENT_MONITOR_SERVER_URL=https://agent-monitor.YOUR.workers.dev
-export AGENT_MONITOR_TOKEN=mytoken123
+export RUNLIGHT_SERVER_URL=https://runlight.YOUR.workers.dev
+export RUNLIGHT_TOKEN=mytoken123
 ```
 
 ## Local Development
@@ -91,7 +92,7 @@ export AGENT_MONITOR_TOKEN=mytoken123
 npx wrangler dev
 
 # Apply migrations locally
-npx wrangler d1 migrations apply agent-monitor-db --local
+npx wrangler d1 migrations apply runlight-db --local
 ```
 
 ## API Endpoints
@@ -113,4 +114,4 @@ Cloudflare Workers free plan includes:
 - 100,000 requests/day
 - 10M D1 row reads/day, 100K writes/day
 
-For personal/small-team agent monitoring this is more than enough.
+For personal or small-team Runlight usage this is more than enough.

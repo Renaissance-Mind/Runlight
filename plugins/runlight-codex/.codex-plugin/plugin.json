@@ -1,0 +1,35 @@
+{
+  "name": "runlight",
+  "version": "0.1.0+codex.20260610112831",
+  "description": "Install and configure Runlight passive observability for Codex sessions.",
+  "author": {
+    "name": "Runlight"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "runlight",
+    "codex",
+    "observability",
+    "hooks",
+    "monitoring"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Runlight",
+    "shortDescription": "Record Codex lifecycle events in Runlight",
+    "longDescription": "Runlight adds a local workflow for installing and configuring passive Codex session observability. It records structured lifecycle, prompt, tool, command, and completion events through a local hook adapter.",
+    "developerName": "Runlight",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Install Runlight for this Codex setup",
+      "Check whether Runlight hooks are configured"
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}

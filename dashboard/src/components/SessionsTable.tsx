@@ -9,9 +9,9 @@ import {
 import StatusBadge from "./StatusBadge";
 import AgentIcon from "./AgentIcon";
 
-const PROJECT_ORDER_STORAGE_KEY = "agent-monitor.dashboard.project-order.v1";
+const PROJECT_ORDER_STORAGE_KEY = "runlight.dashboard.project-order.v1";
 const COLLAPSED_PROJECTS_STORAGE_KEY =
-  "agent-monitor.dashboard.collapsed-projects.v1";
+  "runlight.dashboard.collapsed-projects.v1";
 
 function parseUTC(isoStr: string): number {
   return new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();

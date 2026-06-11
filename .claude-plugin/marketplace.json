@@ -1,21 +1,21 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "agent-monitor-local",
+  "name": "runlight-local",
   "version": "1.0.0",
-  "description": "Local AgentMonitor plugins for passive agent observability.",
+  "description": "Local Runlight plugins for passive agent observability.",
   "owner": {
-    "name": "AgentMonitor"
+    "name": "Runlight"
   },
   "plugins": [
     {
-      "name": "agent-monitor",
-      "displayName": "AgentMonitor",
-      "description": "Record Claude Code lifecycle events in AgentMonitor.",
+      "name": "runlight",
+      "displayName": "Runlight",
+      "description": "Record Claude Code lifecycle events in Runlight.",
       "version": "0.1.0",
       "author": {
-        "name": "AgentMonitor"
+        "name": "Runlight"
       },
-      "source": "./plugins/agent-monitor-claude",
+      "source": "./plugins/runlight-claude",
       "category": "development",
       "tags": [
         "observability",

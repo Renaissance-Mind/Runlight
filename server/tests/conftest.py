@@ -9,10 +9,10 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from agent_monitor.db.models import Base
+from runlight.db.models import Base
 
-os.environ["AGENT_MONITOR_DATABASE_URL"] = "sqlite+aiosqlite://"
-os.environ["AGENT_MONITOR_TOKEN_MAP"] = "test-token-1:user-alice,test-token-2:user-bob"
+os.environ["RUNLIGHT_DATABASE_URL"] = "sqlite+aiosqlite://"
+os.environ["RUNLIGHT_TOKEN_MAP"] = "test-token-1:user-alice,test-token-2:user-bob"
 
 
 @pytest_asyncio.fixture
@@ -30,8 +30,8 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def client():
-    import agent_monitor.db.engine as eng
-    import agent_monitor.db.session as sess
+    import runlight.db.engine as eng
+    import runlight.db.session as sess
 
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
     eng._engine = engine
@@ -40,7 +40,7 @@ async def client():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    from agent_monitor.app import create_app
+    from runlight.app import create_app
 
     app = create_app()
     transport = ASGITransport(app=app)

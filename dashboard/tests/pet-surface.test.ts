@@ -26,7 +26,7 @@ describe("pet surface snapshot", () => {
     );
 
     assert.deepEqual(snapshot, {
-      schemaVersion: "agent-monitor.pet-surface.v1",
+      schemaVersion: "runlight.pet-surface.v1",
       mood: "waiting",
       attentionLevel: "medium",
       counts: {

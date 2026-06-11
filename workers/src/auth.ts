@@ -11,7 +11,7 @@ export function resolveUser(env: Env, authorization: string | null): string {
 
   if (!token) return DEFAULT_USER;
 
-  const tokenMap = parseTokenMap(env.TOKEN_MAP);
+  const tokenMap = parseTokenMap(env.RUNLIGHT_TOKEN_MAP ?? env.TOKEN_MAP);
   if (Object.keys(tokenMap).length === 0) return DEFAULT_USER;
 
   const userId = tokenMap[token];

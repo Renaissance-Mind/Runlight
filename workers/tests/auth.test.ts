@@ -25,6 +25,18 @@ describe("worker auth contract", () => {
     assert.equal(userId, "user-b");
   });
 
+  it("prefers RUNLIGHT_TOKEN_MAP over the legacy TOKEN_MAP alias", () => {
+    const userId = resolveUser(
+      {
+        RUNLIGHT_TOKEN_MAP: "tok-new:user-new",
+        TOKEN_MAP: "tok-old:user-old",
+      },
+      "Bearer tok-new",
+    );
+
+    assert.equal(userId, "user-new");
+  });
+
   it("rejects unknown bearer tokens when a token map is configured", () => {
     assert.throws(
       () => resolveUser({ TOKEN_MAP: "tok-a:user-a" }, "Bearer missing"),

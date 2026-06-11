@@ -3,12 +3,12 @@ import { type CSSProperties, memo } from "react";
 import {
   defaultPetState,
   petStates,
-  type AgentMonitorPetStateId,
+  type RunlightPetStateId,
 } from "./petStates";
 
 interface PetSpriteProps {
   src: string;
-  state?: AgentMonitorPetStateId;
+  state?: RunlightPetStateId;
   scale?: number;
   label?: string;
   className?: string;
@@ -28,7 +28,7 @@ function PetSpriteImpl({
     <div
       className={`pet-sprite-frame ${className}`}
       role="img"
-      aria-label={label ?? "AgentMonitor pet"}
+      aria-label={label ?? "Runlight pet"}
       style={
         {
           "--pet-scale": scale,
@@ -51,4 +51,4 @@ function PetSpriteImpl({
 }
 
 export const PetSprite = memo(PetSpriteImpl);
-export type { AgentMonitorPetStateId };
+export type { RunlightPetStateId };

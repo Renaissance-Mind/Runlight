@@ -4,5 +4,5 @@ import type { Env } from "../types";
 export const health = new Hono<{ Bindings: Env }>();
 
 health.get("/health", (c) => {
-  return c.json({ status: "ok", service: "agent-monitor" });
+  return c.json({ status: "ok", service: "runlight" });
 });

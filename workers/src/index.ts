@@ -19,8 +19,8 @@ api.route("/api", sessions);
 api.route("/api", ingest);
 
 // Support both root deployment and /server prefix deployment.
-// - Workers.dev:  https://agent-monitor.xxx.workers.dev/api/health
-// - Custom domain: https://agentmonitor.xxx.com/server/api/health
+// - Workers.dev:  https://runlight.xxx.workers.dev/api/health
+// - Custom domain: https://runlight.xxx.com/server/api/health
 const app = new Hono<{ Bindings: Env }>();
 app.route("/", api);
 app.route("/server", api);

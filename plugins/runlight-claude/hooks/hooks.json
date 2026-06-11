@@ -1,0 +1,124 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "RUNLIGHT_SERVER_URL=\"${user_config.server_url}\" RUNLIGHT_TOKEN=\"${user_config.token}\" bash \"${CLAUDE_PLUGIN_ROOT}/scripts/runlight-hook.sh\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

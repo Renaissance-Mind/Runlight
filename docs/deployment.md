@@ -1,6 +1,6 @@
-# AgentMonitor Deployment
+# Runlight Deployment
 
-AgentMonitor has three independently deployable pieces:
+Runlight has three independently deployable pieces:
 
 - Agent Client: Codex, Claude Code, Python, or other adapters that emit events.
 - Server: FastAPI storage and query service.
@@ -16,7 +16,7 @@ The connection contract is the same for all deployments:
 ```
 
 An empty token maps to the server's `default` user. A non-empty token maps to a
-user through `AGENT_MONITOR_TOKEN_MAP`.
+user through `RUNLIGHT_TOKEN_MAP`.
 
 ## Local Single-User
 
@@ -26,14 +26,14 @@ machine.
 Start the server:
 
 ```bash
-cd /Users/caopu/workspace/AgentMonitor/server
-/Users/caopu/miniforge3/bin/python -m uvicorn agent_monitor.app:app --host 127.0.0.1 --port 8766
+cd /path/to/Runlight/server
+/Users/caopu/miniforge3/bin/python -m uvicorn runlight.app:app --host 127.0.0.1 --port 8766
 ```
 
 Start the dashboard:
 
 ```bash
-cd /Users/caopu/workspace/AgentMonitor/dashboard
+cd /path/to/Runlight/dashboard
 npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
@@ -54,9 +54,9 @@ network.
 Start the server on the host machine:
 
 ```bash
-cd /Users/caopu/workspace/AgentMonitor/server
-AGENT_MONITOR_TOKEN_MAP='tok-alice:alice,tok-bob:bob' \
-  /Users/caopu/miniforge3/bin/python -m uvicorn agent_monitor.app:app --host 0.0.0.0 --port 8766
+cd /path/to/Runlight/server
+RUNLIGHT_TOKEN_MAP='tok-alice:alice,tok-bob:bob' \
+  /Users/caopu/miniforge3/bin/python -m uvicorn runlight.app:app --host 0.0.0.0 --port 8766
 ```
 
 Use the server machine's LAN IP from clients and dashboards:
@@ -74,7 +74,7 @@ requests. Agent clients send the same header on ingest requests.
 ## Remote Server
 
 For an internet-facing server, put TLS and any additional hardening in front of
-the FastAPI process through a reverse proxy. The AgentMonitor server still sees
+the FastAPI process through a reverse proxy. The Runlight server still sees
 the same URL/token contract:
 
 ```json
@@ -87,9 +87,9 @@ the same URL/token contract:
 Recommended server environment:
 
 ```bash
-AGENT_MONITOR_DATABASE_URL='postgresql+asyncpg://agent_monitor:<password>@<host>:5432/agent_monitor'
-AGENT_MONITOR_TOKEN_MAP='tok-alice:alice,tok-bob:bob'
-AGENT_MONITOR_CORS_ORIGINS='https://dashboard.example.com'
+RUNLIGHT_DATABASE_URL='postgresql+asyncpg://runlight:<password>@<host>:5432/runlight'
+RUNLIGHT_TOKEN_MAP='tok-alice:alice,tok-bob:bob'
+RUNLIGHT_CORS_ORIGINS='https://dashboard.example.com'
 ```
 
 ## Configure Codex Hook Client
@@ -106,13 +106,13 @@ The Codex plugin stores connection settings next to its hook script:
 For the local repository adapter, edit:
 
 ```text
-/Users/caopu/workspace/AgentMonitor/adapters/codex-hook/settings.json
+/path/to/Runlight/adapters/codex-hook/settings.json
 ```
 
 For the installed Codex plugin, edit:
 
 ```text
-~/.codex/plugins/cache/agent-monitor-local/agent-monitor/<version>/skills/agent-monitor/scripts/settings.json
+~/.codex/plugins/cache/runlight-local/runlight/<version>/skills/runlight/scripts/settings.json
 ```
 
 Installing the Codex plugin makes the skill available; it does not itself write
@@ -120,8 +120,8 @@ Codex lifecycle hooks. Run the packaged skill installer after plugin install or
 update:
 
 ```bash
-AGENT_MONITOR_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/agent-monitor-local/agent-monitor/* | head -1)"
-bash "$AGENT_MONITOR_PLUGIN_DIR/skills/agent-monitor/scripts/install-codex-hook.sh"
+RUNLIGHT_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/runlight-local/runlight/* | head -1)"
+bash "$RUNLIGHT_PLUGIN_DIR/skills/runlight/scripts/install-codex-hook.sh"
 ```
 
 The repository adapter installer is for local development. It writes to
@@ -135,13 +135,13 @@ Claude Code plugin loading does not consistently register hooks from plugin
 metadata.
 
 ```bash
-cd /Users/caopu/workspace/AgentMonitor/plugins/agent-monitor-claude
+cd /path/to/Runlight/plugins/runlight-claude
 bash install.sh --server http://127.0.0.1:8766
 ```
 
 The installer writes hooks into `~/.claude/settings.json` and stores runtime
 connection options under `pluginConfigs`. The hook reads these keys, with
-`AGENT_MONITOR_SERVER_URL` and `AGENT_MONITOR_TOKEN` taking precedence.
+`RUNLIGHT_SERVER_URL` and `RUNLIGHT_TOKEN` taking precedence.
 
 The repository adapter under `adapters/claude-code-hook` is for local
 development. It stores connection settings in `adapters/claude-code-hook/settings.json`
@@ -152,17 +152,17 @@ and can target a non-default Claude settings file with `CLAUDE_SETTINGS_FILE`.
 The Python adapter uses environment variables:
 
 ```bash
-export AGENT_MONITOR_SERVER_URL=http://127.0.0.1:8766
-export AGENT_MONITOR_TOKEN=
+export RUNLIGHT_SERVER_URL=http://127.0.0.1:8766
+export RUNLIGHT_TOKEN=
 ```
 
-The CLI wrapper is installed by the `agent-monitor-adapter` package and exposes:
+The CLI wrapper is installed by the `runlight-adapter` package and exposes:
 
 ```bash
-agent-monitor run --agent codex -- <command>
-agent-monitor event --session <id> --type <event_type>
-agent-monitor heartbeat --session <id>
-agent-monitor finish --session <id> --result completed
+runlight run --agent codex -- <command>
+runlight event --session <id> --type <event_type>
+runlight heartbeat --session <id>
+runlight finish --session <id> --result completed
 ```
 
 Python clients send heartbeat, sequence, dedupe, and offline-queue metadata; the
@@ -174,11 +174,11 @@ For the Cloudflare Worker deployment, the same client URL/token contract applies
 The Worker environment names are platform-specific:
 
 ```bash
-npx wrangler secret put TOKEN_MAP
+npx wrangler secret put RUNLIGHT_TOKEN_MAP
 ```
 
-Use `TOKEN_MAP` with the same `token:user_id` value format as
-`AGENT_MONITOR_TOKEN_MAP` on the FastAPI server.
+Use `RUNLIGHT_TOKEN_MAP` with the same `token:user_id` value format as the
+FastAPI server. `TOKEN_MAP` remains supported as a legacy Worker alias.
 
 ## Configure Dashboard
 

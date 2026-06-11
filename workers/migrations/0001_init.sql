@@ -1,4 +1,4 @@
--- Initial schema for AgentMonitor on Cloudflare D1
+-- Initial schema for Runlight on Cloudflare D1
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

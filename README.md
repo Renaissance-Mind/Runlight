@@ -1,7 +1,7 @@
-# AgentMonitor
+# Runlight
 
 <p align="center">
-  <img src="dashboard/src-tauri/icons/icon.png" alt="AgentMonitor icon" width="96">
+  <img src="dashboard/src-tauri/icons/icon.png" alt="Runlight icon" width="96">
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
   <img src="https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white" alt="macOS 14+">
 </p>
 
-AgentMonitor records lifecycle events from Codex, Claude Code, and custom
+Runlight records lifecycle events from Codex, Claude Code, and custom
 agent adapters without taking control of the agent. It stores session starts,
 heartbeats, tool and command activity, prompts, permission waits, completions,
 failures, and aborts behind one shared API.
@@ -86,9 +86,9 @@ model and deployment boundaries.
 | [menubar/](menubar/) | Swift macOS menu bar viewer |
 | [adapters/codex-hook/](adapters/codex-hook/) | Local-development Codex hook installer and script |
 | [adapters/claude-code-hook/](adapters/claude-code-hook/) | Local-development Claude Code hook installer and script |
-| [adapters/python/](adapters/python/) | Python client library and `agent-monitor` CLI |
-| [plugins/agent-monitor-codex/](plugins/agent-monitor-codex/) | Packaged Codex plugin |
-| [plugins/agent-monitor-claude/](plugins/agent-monitor-claude/) | Packaged Claude Code plugin |
+| [adapters/python/](adapters/python/) | Python client library and `runlight` CLI |
+| [plugins/runlight-codex/](plugins/runlight-codex/) | Packaged Codex plugin |
+| [plugins/runlight-claude/](plugins/runlight-claude/) | Packaged Claude Code plugin |
 | [docs/](docs/) | Architecture and deployment notes |
 
 ## Quick Start
@@ -103,7 +103,7 @@ cd server
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m uvicorn agent_monitor.app:app --host 127.0.0.1 --port 8766
+python -m uvicorn runlight.app:app --host 127.0.0.1 --port 8766
 ```
 
 Verify the server:
@@ -115,7 +115,7 @@ curl http://127.0.0.1:8766/api/health
 Expected response:
 
 ```json
-{"status":"ok","service":"agent-monitor"}
+{"status":"ok","service":"runlight"}
 ```
 
 ### 2. Start the dashboard
@@ -158,7 +158,7 @@ dashboard.
 ### Codex
 
 The repository includes both a local hook adapter and a packaged Codex plugin.
-The plugin installation makes the AgentMonitor skill and scripts available; the
+The plugin installation makes the Runlight skill and scripts available; the
 hook installer is the step that starts event collection.
 
 Local adapter:
@@ -170,11 +170,11 @@ bash adapters/codex-hook/install.sh http://127.0.0.1:8766
 Packaged plugin flow:
 
 ```bash
-codex plugin marketplace add /path/to/AgentMonitor
-codex plugin add agent-monitor@agent-monitor-local
+codex plugin marketplace add /path/to/Runlight
+codex plugin add runlight@runlight-local
 
-AGENT_MONITOR_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/agent-monitor-local/agent-monitor/* | head -1)"
-bash "$AGENT_MONITOR_PLUGIN_DIR/skills/agent-monitor/scripts/install-codex-hook.sh"
+RUNLIGHT_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/runlight-local/runlight/* | head -1)"
+bash "$RUNLIGHT_PLUGIN_DIR/skills/runlight/scripts/install-codex-hook.sh"
 ```
 
 Codex events include session title and pinned-thread state when those local
@@ -191,7 +191,7 @@ bash adapters/claude-code-hook/install.sh http://127.0.0.1:8766
 Use the packaged plugin for Claude Code plugin workflows:
 
 ```bash
-cd plugins/agent-monitor-claude
+cd plugins/runlight-claude
 bash install.sh --server http://127.0.0.1:8766
 ```
 
@@ -210,22 +210,22 @@ pip install -e ".[dev]"
 Wrap a command:
 
 ```bash
-agent-monitor run --agent generic -- python -m pytest
+runlight run --agent generic -- python -m pytest
 ```
 
 Send manual lifecycle events:
 
 ```bash
-agent-monitor event --session demo-1 --type user_input.waiting --summary "Waiting for review"
-agent-monitor heartbeat --session demo-1
-agent-monitor finish --session demo-1 --result completed --summary "Done"
+runlight event --session demo-1 --type user_input.waiting --summary "Waiting for review"
+runlight heartbeat --session demo-1
+runlight finish --session demo-1 --result completed --summary "Done"
 ```
 
 Configure the adapter with environment variables:
 
 ```bash
-export AGENT_MONITOR_SERVER_URL=http://127.0.0.1:8766
-export AGENT_MONITOR_TOKEN=
+export RUNLIGHT_SERVER_URL=http://127.0.0.1:8766
+export RUNLIGHT_TOKEN=
 ```
 
 ## Deployment
@@ -236,15 +236,15 @@ The FastAPI server uses SQLite by default:
 
 ```bash
 cd server
-python -m uvicorn agent_monitor.app:app --host 127.0.0.1 --port 8766
+python -m uvicorn runlight.app:app --host 127.0.0.1 --port 8766
 ```
 
 For LAN access or multi-user testing, bind to all interfaces and set a token
 map:
 
 ```bash
-AGENT_MONITOR_TOKEN_MAP='tok-alice:alice,tok-bob:bob' \
-python -m uvicorn agent_monitor.app:app --host 0.0.0.0 --port 8766
+RUNLIGHT_TOKEN_MAP='tok-alice:alice,tok-bob:bob' \
+python -m uvicorn runlight.app:app --host 0.0.0.0 --port 8766
 ```
 
 Clients and viewers then use the same connection shape:
@@ -259,7 +259,7 @@ Clients and viewers then use the same connection shape:
 For PostgreSQL, set:
 
 ```bash
-export AGENT_MONITOR_DATABASE_URL='postgresql+asyncpg://agent_monitor:<password>@<host>:5432/agent_monitor'
+export RUNLIGHT_DATABASE_URL='postgresql+asyncpg://runlight:<password>@<host>:5432/runlight'
 ```
 
 ### Cloudflare Workers and D1
@@ -277,14 +277,14 @@ Copy the generated D1 database id into [workers/wrangler.toml](workers/wrangler.
 then run:
 
 ```bash
-npx wrangler d1 migrations apply agent-monitor-db --remote
-npx wrangler secret put TOKEN_MAP
+npx wrangler d1 migrations apply runlight-db --remote
+npx wrangler secret put RUNLIGHT_TOKEN_MAP
 npm run deploy
 ```
 
-Use `TOKEN_MAP` with the same `token:user_id` format as
-`AGENT_MONITOR_TOKEN_MAP`. See [workers/README.md](workers/README.md) for the
-full Cloudflare flow.
+Use `RUNLIGHT_TOKEN_MAP` with the same `token:user_id` format as the FastAPI
+server. See [workers/README.md](workers/README.md) for the full Cloudflare
+flow.
 
 ## API Contract
 
@@ -324,20 +324,23 @@ Standard event types include `session.started`, `session.heartbeat`,
 
 ## Configuration
 
-Server environment variables use the `AGENT_MONITOR_` prefix.
+Server environment variables use the `RUNLIGHT_` prefix.
 
 | Variable | Default | Description |
 |---|---|---|
-| `AGENT_MONITOR_SERVER_HOST` | `127.0.0.1` | Host used by server settings |
-| `AGENT_MONITOR_SERVER_PORT` | `8766` | Port used by server settings |
-| `AGENT_MONITOR_DATABASE_URL` | `sqlite+aiosqlite:///agent_monitor.db` | SQLAlchemy database URL |
-| `AGENT_MONITOR_TOKEN_MAP` | empty | Comma-separated `token:user_id` map |
-| `AGENT_MONITOR_ALLOWED_TOKENS` | empty | Tokens mapped to the default user |
-| `AGENT_MONITOR_HEARTBEAT_STALE_SECONDS` | `120` | Gap before a live session is marked stale |
-| `AGENT_MONITOR_EVENT_RETENTION_DAYS` | `30` | Event retention setting |
-| `AGENT_MONITOR_SESSION_RETENTION_DAYS` | `90` | Session retention setting |
-| `AGENT_MONITOR_CORS_ORIGINS` | `*` | Comma-separated allowed origins |
-| `AGENT_MONITOR_MAX_PAYLOAD_BYTES` | `65536` | Maximum accepted payload size |
+| `RUNLIGHT_SERVER_HOST` | `127.0.0.1` | Host used by server settings |
+| `RUNLIGHT_SERVER_PORT` | `8766` | Port used by server settings |
+| `RUNLIGHT_DATABASE_URL` | `sqlite+aiosqlite:///runlight.db` | SQLAlchemy database URL |
+| `RUNLIGHT_TOKEN_MAP` | empty | Comma-separated `token:user_id` map |
+| `RUNLIGHT_ALLOWED_TOKENS` | empty | Tokens mapped to the default user |
+| `RUNLIGHT_HEARTBEAT_STALE_SECONDS` | `120` | Gap before a live session is marked stale |
+| `RUNLIGHT_EVENT_RETENTION_DAYS` | `30` | Event retention setting |
+| `RUNLIGHT_SESSION_RETENTION_DAYS` | `90` | Session retention setting |
+| `RUNLIGHT_CORS_ORIGINS` | `*` | Comma-separated allowed origins |
+| `RUNLIGHT_MAX_PAYLOAD_BYTES` | `65536` | Maximum accepted payload size |
+
+The server and adapters still accept the previous `AGENT_MONITOR_*` names as
+compatibility fallbacks, but new deployments should use `RUNLIGHT_*`.
 
 An empty or missing bearer token maps to the `default` user. Once a token map is
 configured, unknown bearer tokens are rejected.
@@ -390,7 +393,7 @@ pytest
 
 ```bash
 cd menubar
-swift run AgentMonitorBar
+swift run RunlightBar
 ```
 
 ## Documentation
@@ -398,8 +401,8 @@ swift run AgentMonitorBar
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
 - [Cloudflare Worker backend](workers/README.md)
-- [Codex plugin](plugins/agent-monitor-codex/README.md)
-- [Claude Code plugin](plugins/agent-monitor-claude/README.md)
+- [Codex plugin](plugins/runlight-codex/README.md)
+- [Claude Code plugin](plugins/runlight-claude/README.md)
 
 ## Known Boundaries
 

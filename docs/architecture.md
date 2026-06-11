@@ -1,8 +1,8 @@
-# AgentMonitor Architecture
+# Runlight Architecture
 
 ## Overview
 
-AgentMonitor is a passive observability system for AI coding agents. It records lifecycle events (session start/end, tool use, prompts, completions) and provides real-time visibility into agent activity.
+Runlight is a passive observability system for AI coding agents. It records lifecycle events (session start/end, tool use, prompts, completions) and provides real-time visibility into agent activity.
 
 The system has three layers:
 
@@ -23,8 +23,8 @@ Plugins that hook into agent lifecycle events and POST them to the server.
 
 | Agent | Plugin Location | Install Method |
 |---|---|---|
-| Claude Code | `plugins/agent-monitor-claude/` | Plugin marketplace or `install.sh` |
-| Codex CLI | `plugins/agent-monitor-codex/` | `install-codex-hook.sh` |
+| Claude Code | `plugins/runlight-claude/` | Plugin marketplace or `install.sh` |
+| Codex CLI | `plugins/runlight-codex/` | `install-codex-hook.sh` |
 
 All clients share the same contract:
 - Report events to `POST /api/events`
@@ -47,7 +47,7 @@ Multiple viewers, all consuming the same server API:
 | Viewer | Location | Type |
 |---|---|---|
 | Dashboard | `dashboard/` | Web app (React) |
-| Menubar | `menubar/` | macOS desktop app (Tauri) |
+| Menubar | `menubar/` | macOS menu bar app (Swift) |
 
 ---
 
@@ -69,7 +69,7 @@ For personal use or small teams. Zero-config single-user by default.
 
 | Component | How to Run |
 |---|---|
-| Server + Dashboard | `docker-compose up` or `pip install` + `uvicorn` |
+| Server + Dashboard | Run FastAPI with `uvicorn`; run dashboard with Vite |
 | Menubar | Standalone desktop app, connect to local server |
 | Client | Install plugin, configure URL + token |
 
@@ -88,7 +88,7 @@ For personal use or small teams. Zero-config single-user by default.
 **Server configuration** (multi-user):
 
 ```bash
-AGENT_MONITOR_TOKEN_MAP="token_alice:alice,token_bob:bob"
+RUNLIGHT_TOKEN_MAP="token_alice:alice,token_bob:bob"
 ```
 
 ### Mode 2: Cloudflare Cloud-Hosted
@@ -136,16 +136,16 @@ Installation is **identical** regardless of deployment mode:
 **Claude Code**:
 ```bash
 # Option A: Plugin marketplace
-# /marketplace add github:caopulan/AgentMonitor
-# /plugin install agent-monitor
+# /marketplace add github:Renaissance-Mind/Runlight
+# /plugin install runlight
 
 # Option B: Manual
-bash plugins/agent-monitor-claude/install.sh
+bash plugins/runlight-claude/install.sh
 ```
 
 **Codex CLI**:
 ```bash
-bash plugins/agent-monitor-codex/skills/agent-monitor/scripts/install-codex-hook.sh
+bash plugins/runlight-codex/skills/runlight/scripts/install-codex-hook.sh
 ```
 
 ### Configuration

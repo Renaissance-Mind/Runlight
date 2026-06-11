@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "AgentMonitorBar",
+    name: "RunlightBar",
     platforms: [
         .macOS(.v14),
     ],
     targets: [
         .executableTarget(
-            name: "AgentMonitorBar",
-            path: "Sources/AgentMonitorBar",
+            name: "RunlightBar",
+            path: "Sources/RunlightBar",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
             ]

@@ -24,13 +24,19 @@ declare global {
 export function readConfiguredPetAsset(
   env: PetAssetEnv = import.meta.env,
 ): DashboardPetAsset | null {
-  const spriteUrl = env.VITE_AGENT_MONITOR_PET_SPRITE_URL?.trim();
+  const spriteUrl = (
+    env.VITE_RUNLIGHT_PET_SPRITE_URL
+    ?? env.VITE_AGENT_MONITOR_PET_SPRITE_URL
+  )?.trim();
   if (!spriteUrl) return null;
 
   return {
     source: "configured",
     slug: "configured",
-    displayName: env.VITE_AGENT_MONITOR_PET_NAME?.trim() || "AgentMonitor Pet",
+    displayName: (
+      env.VITE_RUNLIGHT_PET_NAME
+      ?? env.VITE_AGENT_MONITOR_PET_NAME
+    )?.trim() || "Runlight Pet",
     spriteUrl,
   };
 }

@@ -1,7 +1,7 @@
-import type { AgentMonitorPetStateId } from "../components/pet/petStates";
+import type { RunlightPetStateId } from "../components/pet/petStates";
 import type { PetSurfaceSnapshot } from "./petSurface";
 
-export type { AgentMonitorPetStateId };
+export type { RunlightPetStateId };
 
 const promptEvents = new Set(["user.prompt", "message.started"]);
 const completionEvents = new Set(["message.finished", "session.completed"]);
@@ -9,7 +9,7 @@ const terminalStatuses = new Set(["finished", "completed"]);
 
 export function petStateFromSurface(
   surface: PetSurfaceSnapshot,
-): AgentMonitorPetStateId {
+): RunlightPetStateId {
   switch (surface.mood) {
     case "alert":
       return "failed";

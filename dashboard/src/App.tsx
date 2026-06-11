@@ -70,7 +70,7 @@ function Dashboard({ config, prefs }: { config: DashboardConnectionConfig; prefs
       <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-sm font-bold text-white tracking-tight">
-            AgentMonitor
+            Runlight
           </h1>
           <span className="text-[10px] text-gray-600 uppercase">
             Live Sessions
@@ -94,7 +94,7 @@ function Dashboard({ config, prefs }: { config: DashboardConnectionConfig; prefs
 
       <footer className="border-t border-surface-3 px-4 py-1.5 text-[10px] text-gray-600 flex justify-between">
         <span>{filtered.length} session(s){filtered.length < sessions.length ? ` (${sessions.length - filtered.length} hidden)` : ""}</span>
-        <span>AgentMonitor v0.1.0</span>
+        <span>Runlight v0.1.0</span>
       </footer>
     </div>
   );

@@ -1,5 +1,5 @@
 {
-  "name": "agent-monitor-worker",
+  "name": "runlight-worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,9 @@
     "deploy:check": "node scripts/validate-wrangler.mjs",
     "predeploy": "npm run deploy:check",
     "deploy": "wrangler deploy",
-    "db:create": "wrangler d1 create agent-monitor-db",
-    "db:migrate": "wrangler d1 migrations apply agent-monitor-db",
-    "db:migrate:local": "wrangler d1 migrations apply agent-monitor-db --local"
+    "db:create": "wrangler d1 create runlight-db",
+    "db:migrate": "wrangler d1 migrations apply runlight-db",
+    "db:migrate:local": "wrangler d1 migrations apply runlight-db --local"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250601.0",

@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   petStateFromSurface,
-  type AgentMonitorPetStateId,
+  type RunlightPetStateId,
 } from "../src/api/petSpriteState.ts";
 import type { PetSurfaceSnapshot } from "../src/api/petSurface.ts";
 
@@ -12,7 +12,7 @@ function snapshot(
   overrides: Partial<PetSurfaceSnapshot> = {},
 ): PetSurfaceSnapshot {
   return {
-    schemaVersion: "agent-monitor.pet-surface.v1",
+    schemaVersion: "runlight.pet-surface.v1",
     mood,
     attentionLevel: "none",
     counts: {
@@ -29,8 +29,8 @@ function snapshot(
 }
 
 describe("pet sprite state mapping", () => {
-  it("maps AgentMonitor moods to Petdex animation states", () => {
-    const cases: Array<[PetSurfaceSnapshot["mood"], AgentMonitorPetStateId]> = [
+  it("maps Runlight moods to Petdex animation states", () => {
+    const cases: Array<[PetSurfaceSnapshot["mood"], RunlightPetStateId]> = [
       ["alert", "failed"],
       ["waiting", "waiting"],
       ["working", "running"],

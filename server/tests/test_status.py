@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone, timedelta
 
-from agent_monitor.services.status_engine import infer_status
+from runlight.services.status_engine import infer_status
 
 
 class TestStatusEngine:

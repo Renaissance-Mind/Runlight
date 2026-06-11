@@ -3,7 +3,7 @@
 from unittest.mock import patch, MagicMock
 import argparse
 
-from agent_monitor_adapter.cli import cmd_run, cmd_event, cmd_heartbeat, cmd_finish
+from runlight_adapter.cli import cmd_run, cmd_event, cmd_heartbeat, cmd_finish
 
 
 class TestCLIHandlers:
@@ -14,7 +14,7 @@ class TestCLIHandlers:
             severity="info",
             summary="Running test",
         )
-        with patch("agent_monitor_adapter.cli.AgentMonitorClient") as MockClient:
+        with patch("runlight_adapter.cli.RunlightClient") as MockClient:
             instance = MockClient.return_value
             result = cmd_event(args)
             assert result == 0
@@ -27,7 +27,7 @@ class TestCLIHandlers:
 
     def test_cmd_heartbeat(self):
         args = argparse.Namespace(session="sess-1")
-        with patch("agent_monitor_adapter.cli.AgentMonitorClient") as MockClient:
+        with patch("runlight_adapter.cli.RunlightClient") as MockClient:
             instance = MockClient.return_value
             result = cmd_heartbeat(args)
             assert result == 0
@@ -35,7 +35,7 @@ class TestCLIHandlers:
 
     def test_cmd_finish(self):
         args = argparse.Namespace(session="sess-1", result="completed", summary="Done")
-        with patch("agent_monitor_adapter.cli.AgentMonitorClient") as MockClient:
+        with patch("runlight_adapter.cli.RunlightClient") as MockClient:
             instance = MockClient.return_value
             result = cmd_finish(args)
             assert result == 0

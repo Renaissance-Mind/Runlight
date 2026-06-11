@@ -1,5 +1,5 @@
 // Adapted from crafter-station/petdex under the MIT license.
-export type AgentMonitorPetStateId =
+export type RunlightPetStateId =
   | "idle"
   | "running-right"
   | "running-left"
@@ -11,7 +11,7 @@ export type AgentMonitorPetStateId =
   | "review";
 
 export interface PetState {
-  id: AgentMonitorPetStateId;
+  id: RunlightPetStateId;
   row: number;
   frames: number;
   durationMs: number;

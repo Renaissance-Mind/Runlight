@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from agent_monitor.db.models import Event, Machine, Session, Token, User
+from runlight.db.models import Event, Machine, Session, Token, User
 
 
 class TestModels:
@@ -67,4 +67,4 @@ class TestHealthEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
-        assert data["service"] == "agent-monitor"
+        assert data["service"] == "runlight"

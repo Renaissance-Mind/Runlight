@@ -9,7 +9,7 @@ export type PetMood = "idle" | "working" | "waiting" | "alert" | "offline";
 export type PetAttentionLevel = "none" | "low" | "medium" | "high";
 
 export interface PetSurfaceSnapshot {
-  schemaVersion: "agent-monitor.pet-surface.v1";
+  schemaVersion: "runlight.pet-surface.v1";
   mood: PetMood;
   attentionLevel: PetAttentionLevel;
   counts: SessionSurfaceCounts;
@@ -37,7 +37,7 @@ export function buildPetSurfaceSnapshot(
   const mood = moodFromCounts(surface.counts);
 
   return {
-    schemaVersion: "agent-monitor.pet-surface.v1",
+    schemaVersion: "runlight.pet-surface.v1",
     mood: mood.mood,
     attentionLevel: mood.attentionLevel,
     counts: surface.counts,

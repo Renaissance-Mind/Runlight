@@ -5,11 +5,12 @@ import {
   buildApiUrl,
   buildRequestHeaders,
   parseStoredDashboardConfig,
+  readStoredDashboardConfig,
   resolveDashboardConfig,
 } from "../src/api/config.ts";
 
 describe("dashboard server connection config", () => {
-  it("defaults to the local AgentMonitor server", () => {
+  it("defaults to the local Runlight server", () => {
     const config = resolveDashboardConfig({});
 
     assert.deepEqual(config, {
@@ -20,8 +21,8 @@ describe("dashboard server connection config", () => {
 
   it("uses explicit server URL and token env values", () => {
     const config = resolveDashboardConfig({
-      VITE_AGENT_MONITOR_SERVER_URL: "https://monitor.example.com/",
-      VITE_AGENT_MONITOR_TOKEN: "tok-user-1",
+      VITE_RUNLIGHT_SERVER_URL: "https://monitor.example.com/",
+      VITE_RUNLIGHT_TOKEN: "tok-user-1",
     });
 
     assert.deepEqual(config, {
@@ -30,11 +31,23 @@ describe("dashboard server connection config", () => {
     });
   });
 
+  it("accepts legacy AgentMonitor env values", () => {
+    const config = resolveDashboardConfig({
+      VITE_AGENT_MONITOR_SERVER_URL: "https://legacy.example.com/",
+      VITE_AGENT_MONITOR_TOKEN: "legacy-token",
+    });
+
+    assert.deepEqual(config, {
+      serverUrl: "https://legacy.example.com",
+      token: "legacy-token",
+    });
+  });
+
   it("lets stored runtime config override env values", () => {
     const config = resolveDashboardConfig(
       {
-        VITE_AGENT_MONITOR_SERVER_URL: "https://env.example.com",
-        VITE_AGENT_MONITOR_TOKEN: "env-token",
+        VITE_RUNLIGHT_SERVER_URL: "https://env.example.com",
+        VITE_RUNLIGHT_TOKEN: "env-token",
       },
       {
         serverUrl: "https://runtime.example.com/",
@@ -51,6 +64,25 @@ describe("dashboard server connection config", () => {
   it("ignores malformed stored runtime config", () => {
     assert.equal(parseStoredDashboardConfig("not json"), null);
     assert.equal(parseStoredDashboardConfig('{"serverUrl": 12}'), null);
+  });
+
+  it("reads legacy stored runtime config when the new key is absent", () => {
+    const storage = {
+      getItem(key: string) {
+        if (key === "agent-monitor.dashboard.connection") {
+          return JSON.stringify({
+            serverUrl: "https://legacy-runtime.example.com/",
+            token: "legacy-runtime-token",
+          });
+        }
+        return null;
+      },
+    };
+
+    assert.deepEqual(readStoredDashboardConfig(storage), {
+      serverUrl: "https://legacy-runtime.example.com",
+      token: "legacy-runtime-token",
+    });
   });
 
   it("builds absolute API URLs for remote servers", () => {

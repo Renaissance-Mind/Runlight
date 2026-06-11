@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# Install AgentMonitor hook into Codex
+# Install Runlight hook into Codex
 # Usage: ./install.sh [server_url]
 #
 # Configuration lives in settings.json next to the hook script.
@@ -9,7 +9,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOOK_SCRIPT="${SCRIPT_DIR}/agent-monitor-hook.sh"
+HOOK_SCRIPT="${SCRIPT_DIR}/runlight-hook.sh"
 SETTINGS_FILE="${SCRIPT_DIR}/settings.json"
 CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
 CODEX_HOOKS_JSON="${CODEX_HOME_DIR}/hooks.json"
@@ -38,17 +38,42 @@ fi
 chmod +x "$HOOK_SCRIPT"
 
 SERVER_URL="$(jq -r '.server_url' "$SETTINGS_FILE" 2>/dev/null)"
-echo "Installing AgentMonitor hook for Codex..."
+echo "Installing Runlight hook for Codex..."
 echo "  Hook script: ${HOOK_SCRIPT}"
 echo "  Settings:    ${SETTINGS_FILE}"
 echo "  Server URL:  ${SERVER_URL}"
 
 HOOK_CMD="bash ${HOOK_SCRIPT}"
 
+prune_existing_hooks() {
+  local event="$1"
+  local tmp
+  tmp=$(mktemp)
+  jq --arg event "$event" '
+    if (.hooks[$event] // null) == null then
+      .
+    else
+      .hooks[$event] = (
+        .hooks[$event]
+        | map(
+            .hooks = (
+              .hooks
+              | map(select((.command // "" | test("runlight-hook.sh|agent-monitor-hook.sh")) | not))
+            )
+          )
+        | map(select((.hooks | length) > 0))
+      )
+    end
+  ' "$CODEX_HOOKS_JSON" > "$tmp"
+  mv "$tmp" "$CODEX_HOOKS_JSON"
+}
+
 add_hook() {
   local event="$1"
   local matcher="${2:-}"
   local timeout="${3:-5000}"
+
+  prune_existing_hooks "$event"
 
   local hook_entry
   if [ -n "$matcher" ]; then
@@ -67,7 +92,7 @@ add_hook() {
   local existing
   existing=$(jq -r ".hooks.${event} // [] | .[] | .hooks[]?.command // empty" "$CODEX_HOOKS_JSON" 2>/dev/null)
 
-  if echo "$existing" | grep -q "agent-monitor-hook.sh"; then
+  if echo "$existing" | grep -Eq "runlight-hook.sh|agent-monitor-hook.sh"; then
     echo "  [skip] ${event}: already installed"
     return
   fi

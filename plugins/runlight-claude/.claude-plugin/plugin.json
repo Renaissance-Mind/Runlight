@@ -1,0 +1,36 @@
+{
+  "name": "runlight",
+  "displayName": "Runlight",
+  "description": "Record Claude Code lifecycle events in Runlight.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Runlight"
+  },
+  "homepage": "https://github.com/Renaissance-Mind/Runlight",
+  "license": "UNLICENSED",
+  "keywords": [
+    "runlight",
+    "claude-code",
+    "observability",
+    "hooks",
+    "monitoring"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "userConfig": {
+    "server_url": {
+      "type": "string",
+      "title": "Runlight server URL",
+      "description": "HTTP endpoint for the Runlight server.",
+      "default": "http://127.0.0.1:8766",
+      "required": false
+    },
+    "token": {
+      "type": "string",
+      "title": "Runlight bearer token",
+      "description": "Optional API token for Runlight ingest.",
+      "sensitive": true,
+      "required": false
+    }
+  }
+}

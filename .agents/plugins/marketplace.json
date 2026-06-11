@@ -1,14 +1,14 @@
 {
-  "name": "agent-monitor-local",
+  "name": "runlight-local",
   "interface": {
-    "displayName": "AgentMonitor Local"
+    "displayName": "Runlight Local"
   },
   "plugins": [
     {
-      "name": "agent-monitor",
+      "name": "runlight",
       "source": {
         "source": "local",
-        "path": "./plugins/agent-monitor-codex"
+        "path": "./plugins/runlight-codex"
       },
       "policy": {
         "installation": "AVAILABLE",

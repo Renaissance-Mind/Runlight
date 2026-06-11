@@ -2,18 +2,18 @@
 
 from datetime import datetime, timezone
 
-from agent_monitor.mcp_gateway import MCP_TOOLS, build_envelope_from_tool_call
+from runlight.mcp_gateway import MCP_TOOLS, build_envelope_from_tool_call
 
 
 class TestMCPToolDefinitions:
     def test_all_tools_defined(self):
         names = {t["name"] for t in MCP_TOOLS}
         assert names == {
-            "agent_monitor_start_session",
-            "agent_monitor_record_event",
-            "agent_monitor_heartbeat",
-            "agent_monitor_finish_session",
-            "agent_monitor_get_session_status",
+            "runlight_start_session",
+            "runlight_record_event",
+            "runlight_heartbeat",
+            "runlight_finish_session",
+            "runlight_get_session_status",
         }
 
     def test_all_have_required_fields(self):
@@ -25,7 +25,7 @@ class TestMCPToolDefinitions:
 
 class TestBuildEnvelope:
     def test_start_session(self):
-        env = build_envelope_from_tool_call("agent_monitor_start_session", {
+        env = build_envelope_from_tool_call("runlight_start_session", {
             "session_id": "mcp-sess-1",
             "agent_type": "codex",
             "adapter_name": "codex-mcp",
@@ -41,7 +41,7 @@ class TestBuildEnvelope:
         assert env.summary == "Working on auth"
 
     def test_record_event(self):
-        env = build_envelope_from_tool_call("agent_monitor_record_event", {
+        env = build_envelope_from_tool_call("runlight_record_event", {
             "session_id": "mcp-sess-1",
             "agent_type": "codex",
             "adapter_name": "codex-mcp",
@@ -55,7 +55,7 @@ class TestBuildEnvelope:
         assert env.payload == {"tool_name": "grep"}
 
     def test_heartbeat(self):
-        env = build_envelope_from_tool_call("agent_monitor_heartbeat", {
+        env = build_envelope_from_tool_call("runlight_heartbeat", {
             "session_id": "mcp-sess-1",
             "agent_type": "codex",
             "adapter_name": "codex-mcp",
@@ -65,7 +65,7 @@ class TestBuildEnvelope:
         assert env.severity.value == "debug"
 
     def test_finish_session_completed(self):
-        env = build_envelope_from_tool_call("agent_monitor_finish_session", {
+        env = build_envelope_from_tool_call("runlight_finish_session", {
             "session_id": "mcp-sess-1",
             "agent_type": "codex",
             "adapter_name": "codex-mcp",
@@ -77,7 +77,7 @@ class TestBuildEnvelope:
         assert env.summary == "Task done"
 
     def test_finish_session_failed(self):
-        env = build_envelope_from_tool_call("agent_monitor_finish_session", {
+        env = build_envelope_from_tool_call("runlight_finish_session", {
             "session_id": "mcp-sess-1",
             "agent_type": "codex",
             "adapter_name": "codex-mcp",
@@ -86,7 +86,7 @@ class TestBuildEnvelope:
         assert env.event_type == "session.failed"
 
     def test_finish_session_aborted(self):
-        env = build_envelope_from_tool_call("agent_monitor_finish_session", {
+        env = build_envelope_from_tool_call("runlight_finish_session", {
             "session_id": "mcp-sess-1",
             "agent_type": "codex",
             "adapter_name": "codex-mcp",
@@ -95,7 +95,7 @@ class TestBuildEnvelope:
         assert env.event_type == "session.aborted"
 
     def test_get_session_status_returns_none(self):
-        env = build_envelope_from_tool_call("agent_monitor_get_session_status", {
+        env = build_envelope_from_tool_call("runlight_get_session_status", {
             "session_id": "mcp-sess-1",
         })
         assert env is None
@@ -109,7 +109,7 @@ class TestMCPViaHTTP:
     """Verify MCP-generated events produce the same server state as direct HTTP ingest."""
 
     async def test_mcp_start_then_query(self, client):
-        env = build_envelope_from_tool_call("agent_monitor_start_session", {
+        env = build_envelope_from_tool_call("runlight_start_session", {
             "session_id": "mcp-http-1",
             "agent_type": "codex",
             "adapter_name": "codex-mcp",
@@ -128,16 +128,16 @@ class TestMCPViaHTTP:
     async def test_mcp_lifecycle(self, client):
         base = {"session_id": "mcp-lc-1", "agent_type": "codex", "adapter_name": "codex-mcp"}
 
-        start = build_envelope_from_tool_call("agent_monitor_start_session", base)
+        start = build_envelope_from_tool_call("runlight_start_session", base)
         await client.post("/api/events", json=start.model_dump(mode="json"))
 
-        hb = build_envelope_from_tool_call("agent_monitor_heartbeat", base)
+        hb = build_envelope_from_tool_call("runlight_heartbeat", base)
         await client.post("/api/events", json=hb.model_dump(mode="json"))
 
         resp = await client.get("/api/sessions/mcp-lc-1")
         assert resp.json()["current_status"] == "running"
 
-        finish = build_envelope_from_tool_call("agent_monitor_finish_session", {
+        finish = build_envelope_from_tool_call("runlight_finish_session", {
             **base, "result": "completed", "summary": "Done via MCP"
         })
         await client.post("/api/events", json=finish.model_dump(mode="json"))

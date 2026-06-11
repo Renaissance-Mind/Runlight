@@ -6,7 +6,7 @@ export interface DashboardPreferences {
   hideFinishedAfterHours: number;
 }
 
-const STORAGE_KEY = "agent-monitor.dashboard.preferences";
+const STORAGE_KEY = "runlight.dashboard.preferences";
 
 const DEFAULTS: DashboardPreferences = {
   theme: "dark",

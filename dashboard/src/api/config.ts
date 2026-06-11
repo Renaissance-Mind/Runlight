@@ -4,11 +4,14 @@ export interface DashboardConnectionConfig {
 }
 
 export interface DashboardConfigEnv {
+  VITE_RUNLIGHT_SERVER_URL?: string;
+  VITE_RUNLIGHT_TOKEN?: string;
   VITE_AGENT_MONITOR_SERVER_URL?: string;
   VITE_AGENT_MONITOR_TOKEN?: string;
 }
 
-export const DASHBOARD_CONFIG_STORAGE_KEY = "agent-monitor.dashboard.connection";
+export const DASHBOARD_CONFIG_STORAGE_KEY = "runlight.dashboard.connection";
+const LEGACY_DASHBOARD_CONFIG_STORAGE_KEY = "agent-monitor.dashboard.connection";
 
 function normalizeServerUrl(serverUrl: string): string {
   const trimmed = serverUrl.trim();
@@ -45,9 +48,11 @@ export function resolveDashboardConfig(
 ): DashboardConnectionConfig {
   const envConfig = {
     serverUrl: normalizeServerUrl(
-      env.VITE_AGENT_MONITOR_SERVER_URL ?? "http://127.0.0.1:8766",
+      env.VITE_RUNLIGHT_SERVER_URL
+        ?? env.VITE_AGENT_MONITOR_SERVER_URL
+        ?? "http://127.0.0.1:8766",
     ),
-    token: env.VITE_AGENT_MONITOR_TOKEN ?? "",
+    token: env.VITE_RUNLIGHT_TOKEN ?? env.VITE_AGENT_MONITOR_TOKEN ?? "",
   };
 
   if (!stored) return envConfig;
@@ -60,7 +65,10 @@ export function resolveDashboardConfig(
 export function readStoredDashboardConfig(
   storage: Pick<Storage, "getItem"> = window.localStorage,
 ): DashboardConnectionConfig | null {
-  return parseStoredDashboardConfig(storage.getItem(DASHBOARD_CONFIG_STORAGE_KEY));
+  return (
+    parseStoredDashboardConfig(storage.getItem(DASHBOARD_CONFIG_STORAGE_KEY))
+    ?? parseStoredDashboardConfig(storage.getItem(LEGACY_DASHBOARD_CONFIG_STORAGE_KEY))
+  );
 }
 
 export function writeStoredDashboardConfig(

@@ -1,30 +1,30 @@
-name = "agent-monitor"
+name = "runlight"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "agent-monitor-db"
+database_name = "runlight-db"
 database_id = "YOUR_DATABASE_ID_HERE"
 migrations_dir = "migrations"
 
 [vars]
 HEARTBEAT_STALE_SECONDS = "120"
 CORS_ORIGINS = "*"
-# TOKEN_MAP format: "token1:user1,token2:user2"
-# Set via: wrangler secret put TOKEN_MAP
+# RUNLIGHT_TOKEN_MAP format: "token1:user1,token2:user2"
+# Set via: wrangler secret put RUNLIGHT_TOKEN_MAP
 
 # --- Custom Domain (uncomment and edit after deployment) ---
-# Option A: subdomain (agentmonitor.yourdomain.com)
+# Option A: subdomain (runlight.yourdomain.com)
 # routes = [
-#   { pattern = "agentmonitor.yourdomain.com/*", zone_name = "yourdomain.com" }
+#   { pattern = "runlight.yourdomain.com/*", zone_name = "yourdomain.com" }
 # ]
 #
-# Option B: subdomain + path prefix (agentmonitor.yourdomain.com/server/*)
+# Option B: subdomain + path prefix (runlight.yourdomain.com/server/*)
 # routes = [
-#   { pattern = "agentmonitor.yourdomain.com/server/*", zone_name = "yourdomain.com" }
+#   { pattern = "runlight.yourdomain.com/server/*", zone_name = "yourdomain.com" }
 # ]
 #
 # Option C: use Workers custom domain (simplest, no route needed):
 # [env.production]
-# custom_domain = "agentmonitor.yourdomain.com"
+# custom_domain = "runlight.yourdomain.com"

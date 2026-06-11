@@ -10,8 +10,8 @@ describe("dashboard pet assets", () => {
   it("uses an explicit dashboard pet sprite URL when configured", () => {
     assert.deepEqual(
       readConfiguredPetAsset({
-        VITE_AGENT_MONITOR_PET_SPRITE_URL: "/pets/capy/spritesheet.webp",
-        VITE_AGENT_MONITOR_PET_NAME: "Capy",
+        VITE_RUNLIGHT_PET_SPRITE_URL: "/pets/capy/spritesheet.webp",
+        VITE_RUNLIGHT_PET_NAME: "Capy",
       }),
       {
         source: "configured",
@@ -25,10 +25,25 @@ describe("dashboard pet assets", () => {
   it("ignores blank explicit pet sprite configuration", () => {
     assert.equal(
       readConfiguredPetAsset({
-        VITE_AGENT_MONITOR_PET_SPRITE_URL: "   ",
-        VITE_AGENT_MONITOR_PET_NAME: "Ignored",
+        VITE_RUNLIGHT_PET_SPRITE_URL: "   ",
+        VITE_RUNLIGHT_PET_NAME: "Ignored",
       }),
       null,
+    );
+  });
+
+  it("accepts legacy AgentMonitor pet asset env values", () => {
+    assert.deepEqual(
+      readConfiguredPetAsset({
+        VITE_AGENT_MONITOR_PET_SPRITE_URL: "/pets/legacy.webp",
+        VITE_AGENT_MONITOR_PET_NAME: "Legacy",
+      }),
+      {
+        source: "configured",
+        slug: "configured",
+        displayName: "Legacy",
+        spriteUrl: "/pets/legacy.webp",
+      },
     );
   });
 

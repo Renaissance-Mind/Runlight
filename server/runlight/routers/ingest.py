@@ -1,0 +1,49 @@
+"""Event ingest endpoint."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from runlight.auth import resolve_user
+from runlight.db.session import get_db
+from runlight.protocol import EventBatch, EventEnvelope
+from runlight.services.event_service import store_event
+from runlight.services.session_service import get_session_by_id, upsert_session
+
+router = APIRouter(prefix="/api", tags=["ingest"])
+
+
+def _event_response(event, session) -> dict:
+    return {
+        "event_id": event.event_id,
+        "session_id": session.session_id,
+        "status": session.current_status,
+    }
+
+
+@router.post("/events")
+async def ingest_events(
+    body: EventEnvelope | EventBatch,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(resolve_user),
+):
+    if isinstance(body, EventEnvelope):
+        event, inserted = await store_event(db, body, user_id)
+        if inserted:
+            session = await upsert_session(db, body, user_id)
+        else:
+            session = await get_session_by_id(db, body.session_id)
+        await db.commit()
+        return _event_response(event, session)
+
+    results = []
+    for envelope in body.events:
+        event, inserted = await store_event(db, envelope, user_id)
+        if inserted:
+            session = await upsert_session(db, envelope, user_id)
+        else:
+            session = await get_session_by_id(db, envelope.session_id)
+        results.append(_event_response(event, session))
+    await db.commit()
+    return {"events": results}

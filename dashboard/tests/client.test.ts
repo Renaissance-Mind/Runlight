@@ -16,7 +16,7 @@ const server = createServer((req, res) => {
   res.setHeader("Content-Type", "application/json");
 
   if (req.url === "/api/health") {
-    res.end(JSON.stringify({ status: "ok", service: "agent-monitor" }));
+    res.end(JSON.stringify({ status: "ok", service: "runlight" }));
     return;
   }
 

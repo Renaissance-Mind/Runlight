@@ -4,33 +4,33 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent_monitor_adapter.base import AgentMonitorClient
-from agent_monitor_adapter.codex import CodexAdapter
-from agent_monitor_adapter.claude_code import ClaudeCodeAdapter
+from runlight_adapter.base import RunlightClient
+from runlight_adapter.codex import CodexAdapter
+from runlight_adapter.claude_code import ClaudeCodeAdapter
 
 
 class TestBaseClient:
     def test_init_defaults(self):
-        client = AgentMonitorClient()
+        client = RunlightClient()
         assert client.server_url == "http://127.0.0.1:8766"
         assert client.agent_type == "generic"
         assert client.adapter_name == "python-adapter"
 
     def test_init_from_env(self):
-        with patch.dict("os.environ", {"AGENT_MONITOR_SERVER_URL": "http://custom:9999"}):
-            client = AgentMonitorClient()
+        with patch.dict("os.environ", {"RUNLIGHT_SERVER_URL": "http://custom:9999"}):
+            client = RunlightClient()
             assert client.server_url == "http://custom:9999"
 
     def test_init_empty_token_omits_auth_header(self, monkeypatch):
-        monkeypatch.setenv("AGENT_MONITOR_TOKEN", "   ")
+        monkeypatch.setenv("RUNLIGHT_TOKEN", "   ")
 
-        client = AgentMonitorClient(token="")
+        client = RunlightClient(token="")
 
         assert client.token is None
         assert "Authorization" not in client._headers()
 
     def test_build_event(self):
-        client = AgentMonitorClient(agent_type="test")
+        client = RunlightClient(agent_type="test")
         event = client._build_event(
             session_id="sess-1",
             event_type="session.started",
@@ -42,13 +42,13 @@ class TestBaseClient:
         assert event["sequence"] == 1
 
     def test_sequence_increments(self):
-        client = AgentMonitorClient()
+        client = RunlightClient()
         e1 = client._build_event("s1", "session.started")
         e2 = client._build_event("s1", "session.heartbeat")
         assert e2["sequence"] == e1["sequence"] + 1
 
     def test_redact_payload(self):
-        client = AgentMonitorClient()
+        client = RunlightClient()
         payload = {"name": "test", "api_key": "sk-123", "nested": {"password": "pass"}}
         redacted = client._redact_payload(payload)
         assert redacted["name"] == "test"
@@ -56,13 +56,13 @@ class TestBaseClient:
         assert redacted["nested"]["password"] == "***REDACTED***"
 
     def test_offline_queue_bounded(self):
-        client = AgentMonitorClient(max_queue_size=3)
+        client = RunlightClient(max_queue_size=3)
         for i in range(5):
             client._offline_queue.append({"event_id": str(i)})
         assert len(client._offline_queue) == 3
 
     def test_context_manager(self):
-        with AgentMonitorClient() as client:
+        with RunlightClient() as client:
             assert client is not None
 
 

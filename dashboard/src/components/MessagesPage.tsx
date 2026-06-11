@@ -217,7 +217,7 @@ export default function MessagesPage({
       <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-sm font-bold text-white tracking-tight">
-            AgentMonitor
+            Runlight
           </h1>
           <span className="text-[10px] text-gray-600 uppercase">Messages</span>
         </div>
@@ -251,7 +251,7 @@ export default function MessagesPage({
 
       <footer className="border-t border-surface-3 px-4 py-1.5 text-[10px] text-gray-600 flex justify-between">
         <span>{items.length} session(s)</span>
-        <span>AgentMonitor v0.1.0</span>
+        <span>Runlight v0.1.0</span>
       </footer>
     </div>
   );

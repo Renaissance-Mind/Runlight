@@ -48,8 +48,8 @@ describe("pet-ready session view models", () => {
   it("groups sessions by project while preserving session order", () => {
     const groups = groupSessionsByProject([
       {
-        workspace_project_name: "AgentMonitor",
-        workspace_cwd: "/Users/caopu/workspace/AgentMonitor/server",
+        workspace_project_name: "Runlight",
+        workspace_cwd: "/Users/caopu/workspace/Runlight/server",
         session_id: "s1",
       },
       {
@@ -58,8 +58,8 @@ describe("pet-ready session view models", () => {
         session_id: "s2",
       },
       {
-        workspace_project_name: "AgentMonitor",
-        workspace_cwd: "/Users/caopu/workspace/AgentMonitor/dashboard",
+        workspace_project_name: "Runlight",
+        workspace_cwd: "/Users/caopu/workspace/Runlight/dashboard",
         session_id: "s3",
       },
       {
@@ -75,7 +75,7 @@ describe("pet-ready session view models", () => {
         sessionIds: group.sessions.map((session) => session.session_id),
       })),
       [
-        { projectName: "AgentMonitor", sessionIds: ["s1", "s3"] },
+        { projectName: "Runlight", sessionIds: ["s1", "s3"] },
         { projectName: "Flow-Factory", sessionIds: ["s2"] },
         { projectName: "Unknown project", sessionIds: ["s4"] },
       ],

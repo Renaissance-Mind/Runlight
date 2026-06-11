@@ -1,5 +1,6 @@
 export interface Env {
   DB: D1Database;
+  RUNLIGHT_TOKEN_MAP?: string;
   TOKEN_MAP?: string;
   HEARTBEAT_STALE_SECONDS?: string;
   CORS_ORIGINS?: string;

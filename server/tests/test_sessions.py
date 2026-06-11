@@ -3,8 +3,8 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from agent_monitor.db.models import Session
-from agent_monitor.services.session_service import refresh_session_statuses
+from runlight.db.models import Session
+from runlight.services.session_service import refresh_session_statuses
 
 def _make_event(**overrides) -> dict:
     base = {
@@ -26,7 +26,7 @@ class TestSessionQueries:
         global_state.write_text(
             json.dumps({"pinned-thread-ids": ["codex-local-only"]})
         )
-        monkeypatch.setenv("AGENT_MONITOR_CODEX_GLOBAL_STATE", str(global_state))
+        monkeypatch.setenv("RUNLIGHT_CODEX_GLOBAL_STATE", str(global_state))
 
         resp = await client.get("/api/sessions/live")
         assert resp.status_code == 200

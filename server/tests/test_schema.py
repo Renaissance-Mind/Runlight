@@ -3,7 +3,7 @@
 from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from agent_monitor.db.schema import ensure_schema
+from runlight.db.schema import ensure_schema
 
 
 async def test_ensure_schema_adds_session_metadata_columns():
