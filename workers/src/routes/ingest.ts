@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env, EventEnvelope, EventBatch } from "../types";
-import { resolveUser } from "../auth";
+import { resolveRequestUser } from "../auth";
 import { inferStatus, nextTerminalResult } from "../status";
 
 export const ingest = new Hono<{ Bindings: Env }>();
@@ -222,9 +222,9 @@ async function upsertSession(
 ingest.post("/events", async (c) => {
   let userId: string;
   try {
-    userId = resolveUser(c.env, c.req.header("Authorization") ?? null);
+    userId = await resolveRequestUser(c.env, c.req.raw);
   } catch {
-    return c.json({ detail: "Unknown token" }, 401);
+    return c.json({ detail: "Authentication required" }, 401);
   }
 
   const body = await c.req.json();

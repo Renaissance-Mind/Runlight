@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  buildAuthLoginUrl,
   buildApiUrl,
   buildRequestHeaders,
   parseStoredDashboardConfig,
@@ -89,6 +90,17 @@ describe("dashboard server connection config", () => {
     assert.equal(
       buildApiUrl("https://monitor.example.com/base", "/sessions/live"),
       "https://monitor.example.com/base/api/sessions/live",
+    );
+  });
+
+  it("builds OAuth login URLs from the configured server origin", () => {
+    assert.equal(
+      buildAuthLoginUrl("https://runlight.example.com/", "github", "/messages"),
+      "https://runlight.example.com/auth/login/github?return_to=%2Fmessages",
+    );
+    assert.equal(
+      buildAuthLoginUrl("https://runlight.example.com/server", "google", "//evil.example"),
+      "https://runlight.example.com/server/auth/login/google?return_to=%2F",
     );
   });
 

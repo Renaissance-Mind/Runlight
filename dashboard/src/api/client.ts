@@ -13,6 +13,7 @@ async function fetchJSON<T>(
 ): Promise<T> {
   const resp = await fetch(buildApiUrl(config.serverUrl, path), {
     ...init,
+    credentials: "include",
     headers: {
       ...buildRequestHeaders(config.token),
       ...init?.headers,
@@ -37,6 +38,17 @@ export interface ServerConnectionProbe {
   tokenConfigured: boolean;
   checkedAt: string;
   error: string | null;
+}
+
+export interface UploadTokenRecord {
+  id: number;
+  token_preview: string;
+  created_at: string;
+}
+
+export interface CreatedUploadToken extends UploadTokenRecord {
+  user_id: string;
+  token: string;
 }
 
 export async function fetchLiveSessions(
@@ -114,6 +126,33 @@ export async function fetchCurrentUser(
   config: DashboardConnectionConfig = defaultConfig,
 ): Promise<CurrentUser> {
   return fetchJSON<CurrentUser>(config, "/users/current");
+}
+
+export async function logout(config: DashboardConnectionConfig = defaultConfig): Promise<void> {
+  await fetchJSON<{ ok: true }>(config, "/auth/logout", { method: "POST" });
+}
+
+export async function fetchUploadTokens(
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<UploadTokenRecord[]> {
+  const data = await fetchJSON<{ tokens: UploadTokenRecord[] }>(config, "/tokens");
+  return data.tokens;
+}
+
+export async function createUploadToken(
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<CreatedUploadToken> {
+  const data = await fetchJSON<{ token: CreatedUploadToken }>(config, "/tokens", {
+    method: "POST",
+  });
+  return data.token;
+}
+
+export async function deleteUploadToken(
+  tokenId: number,
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<void> {
+  await fetchJSON<{ deleted: number }>(config, `/tokens/${tokenId}`, { method: "DELETE" });
 }
 
 export async function probeServerConnection(

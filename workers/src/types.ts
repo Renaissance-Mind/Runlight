@@ -1,9 +1,16 @@
 export interface Env {
   DB: D1Database;
+  ASSETS?: Fetcher;
   RUNLIGHT_TOKEN_MAP?: string;
   TOKEN_MAP?: string;
   HEARTBEAT_STALE_SECONDS?: string;
   CORS_ORIGINS?: string;
+  RUNLIGHT_REQUIRE_AUTH?: string;
+  PUBLIC_BASE_URL?: string;
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 export interface SessionRow {

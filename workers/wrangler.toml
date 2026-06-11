@@ -2,15 +2,25 @@ name = "runlight"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
+routes = [
+  { pattern = "runlight.renaissancemind.ai", custom_domain = true },
+]
+
+[assets]
+directory = "../dashboard/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "runlight-db"
-database_id = "YOUR_DATABASE_ID_HERE"
+database_id = "bebf1c59-27ad-4c7a-a217-2c9bdbe49213"
 migrations_dir = "migrations"
 
 [vars]
 HEARTBEAT_STALE_SECONDS = "120"
 CORS_ORIGINS = "*"
+RUNLIGHT_REQUIRE_AUTH = "true"
 # RUNLIGHT_TOKEN_MAP format: "token1:user1,token2:user2"
 # Set via: wrangler secret put RUNLIGHT_TOKEN_MAP
 

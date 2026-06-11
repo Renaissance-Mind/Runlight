@@ -46,14 +46,30 @@ database id.
 npx wrangler d1 migrations apply runlight-db --remote
 ```
 
-### 4. Set Secrets (Optional)
+### 4. Set Secrets
 
-If you want token-based auth (recommended):
+For hosted browser login, create GitHub and Google OAuth apps with these
+callbacks:
+
+```text
+https://runlight.your-domain.com/auth/callback/github
+https://runlight.your-domain.com/auth/callback/google
+```
+
+Set the public origin and provider credentials:
 
 ```bash
-npx wrangler secret put RUNLIGHT_TOKEN_MAP
-# Enter value like: mytoken123:myuser,anothertoken:anotheruser
+npx wrangler secret put PUBLIC_BASE_URL
+npx wrangler secret put GITHUB_CLIENT_ID
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
 ```
+
+For agent hook uploads, sign in to the deployed dashboard after the first
+deploy, open Settings, and generate an upload token. Static `RUNLIGHT_TOKEN_MAP`
+secrets are still supported for controlled small-team deployments, but they are
+not required for the hosted OAuth flow.
 
 ### 5. Deploy
 
@@ -69,6 +85,10 @@ Your API is now live at `https://runlight.<your-subdomain>.workers.dev`
 |----------|---------|-------------|
 | `RUNLIGHT_TOKEN_MAP` | (empty) | `token:user_id` pairs, comma-separated. Set via `wrangler secret put`. |
 | `TOKEN_MAP` | (empty) | Legacy alias for `RUNLIGHT_TOKEN_MAP`. |
+| `PUBLIC_BASE_URL` | request origin | Public dashboard origin used for OAuth callback URLs. |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | (empty) | GitHub OAuth login credentials. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | (empty) | Google OAuth login credentials. |
+| `RUNLIGHT_REQUIRE_AUTH` | unset | Set to `true` in hosted deployments to require OAuth session or bearer token. |
 | `HEARTBEAT_STALE_SECONDS` | `120` | Seconds before a session is marked stale |
 | `CORS_ORIGINS` | `*` | Allowed CORS origins, comma-separated |
 
@@ -77,12 +97,13 @@ Your API is now live at `https://runlight.<your-subdomain>.workers.dev`
 Point your agent hooks and dashboard to the Worker URL:
 
 ```bash
-# Dashboard / MenuBar
-Server URL: https://runlight.YOUR.workers.dev
+# Dashboard
+Open https://runlight.YOUR.workers.dev and sign in with GitHub or Google.
+Create an upload token in Settings.
 
 # Hook adapter
 export RUNLIGHT_SERVER_URL=https://runlight.YOUR.workers.dev
-export RUNLIGHT_TOKEN=mytoken123
+export RUNLIGHT_TOKEN=<upload-token-from-settings>
 ```
 
 ## Local Development
@@ -106,6 +127,9 @@ All endpoints match the Python server exactly:
 - `GET /api/sessions/:id` — Single session
 - `GET /api/sessions/:id/events` — Session events
 - `DELETE /api/sessions/:id` — Delete a session and its events
+- `GET /api/tokens` — List upload token previews for the signed-in user
+- `POST /api/tokens` — Generate an upload token for agent hooks
+- `DELETE /api/tokens/:id` — Delete one upload token
 - `POST /api/events` — Ingest single event or batch (`{events: [...]}`)
 
 ## Costs

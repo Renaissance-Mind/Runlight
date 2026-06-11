@@ -170,15 +170,19 @@ shell hook clients remain fail-open and best-effort.
 
 ## Configure Worker Server
 
-For the Cloudflare Worker deployment, the same client URL/token contract applies.
-The Worker environment names are platform-specific:
+For the Cloudflare Worker deployment, viewers sign in with GitHub or Google
+OAuth and agent hooks upload with bearer tokens generated from the dashboard.
+After deploying, open the hosted dashboard, sign in, go to Settings, and create
+an upload token. Use that token with the same client contract:
 
 ```bash
-npx wrangler secret put RUNLIGHT_TOKEN_MAP
+export RUNLIGHT_SERVER_URL=https://runlight.example.com
+export RUNLIGHT_TOKEN=<upload-token-from-settings>
 ```
 
-Use `RUNLIGHT_TOKEN_MAP` with the same `token:user_id` value format as the
-FastAPI server. `TOKEN_MAP` remains supported as a legacy Worker alias.
+`RUNLIGHT_TOKEN_MAP` with the same `token:user_id` value format as the FastAPI
+server is still supported for controlled static deployments. `TOKEN_MAP` remains
+supported as a legacy Worker alias.
 
 ## Configure Dashboard
 

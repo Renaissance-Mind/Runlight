@@ -3,8 +3,11 @@ import { createServer } from "node:http";
 import { after, before, describe, it } from "node:test";
 
 import {
+  createUploadToken,
   deleteSession,
+  deleteUploadToken,
   fetchCurrentUser,
+  fetchUploadTokens,
   probeServerConnection,
 } from "../src/api/client.ts";
 
@@ -27,6 +30,37 @@ const server = createServer((req, res) => {
 
   if (req.url === "/api/sessions/sess-delete" && req.method === "DELETE") {
     res.end(JSON.stringify({ deleted: "sess-delete" }));
+    return;
+  }
+
+  if (req.url === "/api/tokens" && req.method === "GET") {
+    res.end(JSON.stringify({
+      tokens: [
+        {
+          id: 42,
+          token_preview: "rl_tok_abcd...7890",
+          created_at: "2026-06-11T08:00:00.000Z",
+        },
+      ],
+    }));
+    return;
+  }
+
+  if (req.url === "/api/tokens" && req.method === "POST") {
+    res.end(JSON.stringify({
+      token: {
+        id: 43,
+        user_id: "user-alice",
+        token: "rl_tok_secret",
+        token_preview: "rl_tok_sec...cret",
+        created_at: "2026-06-11T08:01:00.000Z",
+      },
+    }));
+    return;
+  }
+
+  if (req.url === "/api/tokens/42" && req.method === "DELETE") {
+    res.end(JSON.stringify({ deleted: 42 }));
     return;
   }
 
@@ -72,6 +106,28 @@ describe("dashboard runtime API client", () => {
 
   it("deletes a session with the configured token", async () => {
     await deleteSession("sess-delete", { serverUrl, token: "tok-user-1" });
+
+    assert.equal(lastAuthorization, "Bearer tok-user-1");
+  });
+
+  it("manages upload tokens through the configured server", async () => {
+    const config = { serverUrl, token: "tok-user-1" };
+
+    assert.deepEqual(await fetchUploadTokens(config), [
+      {
+        id: 42,
+        token_preview: "rl_tok_abcd...7890",
+        created_at: "2026-06-11T08:00:00.000Z",
+      },
+    ]);
+    assert.deepEqual(await createUploadToken(config), {
+      id: 43,
+      user_id: "user-alice",
+      token: "rl_tok_secret",
+      token_preview: "rl_tok_sec...cret",
+      created_at: "2026-06-11T08:01:00.000Z",
+    });
+    await deleteUploadToken(42, config);
 
     assert.equal(lastAuthorization, "Bearer tok-user-1");
   });

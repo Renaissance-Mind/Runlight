@@ -278,13 +278,22 @@ then run:
 
 ```bash
 npx wrangler d1 migrations apply runlight-db --remote
-npx wrangler secret put RUNLIGHT_TOKEN_MAP
+npx wrangler secret put PUBLIC_BASE_URL
+npx wrangler secret put GITHUB_CLIENT_ID
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
 npm run deploy
 ```
 
-Use `RUNLIGHT_TOKEN_MAP` with the same `token:user_id` format as the FastAPI
-server. See [workers/README.md](workers/README.md) for the full Cloudflare
-flow.
+The hosted dashboard uses GitHub or Google OAuth sessions. After signing in,
+open Settings and generate an upload token for agent hooks. Set
+`PUBLIC_BASE_URL` to the dashboard origin, for example
+`https://runlight.renaissancemind.ai`. OAuth callbacks are
+`/auth/callback/github` and `/auth/callback/google`. `RUNLIGHT_TOKEN_MAP`
+remains available for static small-team deployments, but generated dashboard
+tokens are the normal hosted flow. See [workers/README.md](workers/README.md)
+for the full Cloudflare flow.
 
 ## API Contract
 
@@ -301,6 +310,9 @@ All clients and viewers use the same REST API:
 | `GET` | `/api/sessions/:id/events` | Fetch a session timeline |
 | `GET` | `/api/events/recent` | Fetch recent completion events |
 | `DELETE` | `/api/sessions/:id` | Delete one session and its events |
+| `GET` | `/api/tokens` | List upload token previews for the signed-in user |
+| `POST` | `/api/tokens` | Generate an upload token for agent hooks |
+| `DELETE` | `/api/tokens/:id` | Delete one upload token |
 
 Single-event ingest example:
 
@@ -338,6 +350,7 @@ Server environment variables use the `RUNLIGHT_` prefix.
 | `RUNLIGHT_SESSION_RETENTION_DAYS` | `90` | Session retention setting |
 | `RUNLIGHT_CORS_ORIGINS` | `*` | Comma-separated allowed origins |
 | `RUNLIGHT_MAX_PAYLOAD_BYTES` | `65536` | Maximum accepted payload size |
+| `RUNLIGHT_REQUIRE_AUTH` | unset | Worker-only browser/API mode; set to `true` to require OAuth session or bearer token |
 
 The server and adapters still accept the previous `AGENT_MONITOR_*` names as
 compatibility fallbacks, but new deployments should use `RUNLIGHT_*`.

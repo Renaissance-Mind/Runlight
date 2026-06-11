@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { DashboardConnectionConfig } from "../api/config";
-import type { ServerConnectionProbe } from "../api/client";
+import {
+  createUploadToken,
+  deleteUploadToken,
+  fetchUploadTokens,
+  type CreatedUploadToken,
+  type ServerConnectionProbe,
+  type UploadTokenRecord,
+} from "../api/client";
 import {
   formatConnectionStatus,
   normalizeSettingsDraft,
@@ -35,7 +42,30 @@ export default function SettingsPage({
   const [draft, setDraft] = useState(config);
   const [prefsDraft, setPrefsDraft] = useState(prefs);
   const [saved, setSaved] = useState(false);
+  const [uploadTokens, setUploadTokens] = useState<UploadTokenRecord[]>([]);
+  const [createdToken, setCreatedToken] = useState<CreatedUploadToken | null>(null);
+  const [tokenBusy, setTokenBusy] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const status = formatConnectionStatus(probe);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTokenError(null);
+    fetchUploadTokens(config)
+      .then((tokens) => {
+        if (!cancelled) setUploadTokens(tokens);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setUploadTokens([]);
+          setTokenError(error instanceof Error ? error.message : String(error));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [config.serverUrl, config.token]);
 
   const save = () => {
     const next = normalizeSettingsDraft(draft);
@@ -43,6 +73,48 @@ export default function SettingsPage({
     onSave(next);
     onSavePrefs(prefsDraft);
     setSaved(true);
+  };
+
+  const generateUploadToken = async () => {
+    setTokenBusy(true);
+    setTokenError(null);
+    setCopied(false);
+    try {
+      const token = await createUploadToken(config);
+      setCreatedToken(token);
+      setUploadTokens((current) => [
+        {
+          id: token.id,
+          token_preview: token.token_preview,
+          created_at: token.created_at,
+        },
+        ...current.filter((item) => item.id !== token.id),
+      ]);
+    } catch (error) {
+      setTokenError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTokenBusy(false);
+    }
+  };
+
+  const removeUploadToken = async (tokenId: number) => {
+    setTokenBusy(true);
+    setTokenError(null);
+    try {
+      await deleteUploadToken(tokenId, config);
+      setUploadTokens((current) => current.filter((token) => token.id !== tokenId));
+      if (createdToken?.id === tokenId) setCreatedToken(null);
+    } catch (error) {
+      setTokenError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTokenBusy(false);
+    }
+  };
+
+  const copyCreatedToken = async () => {
+    if (!createdToken) return;
+    await navigator.clipboard.writeText(createdToken.token);
+    setCopied(true);
   };
 
   return (
@@ -107,6 +179,73 @@ export default function SettingsPage({
             >
               Save
             </button>
+          </div>
+        </div>
+
+        <div className="border border-surface-3 bg-surface-1 rounded-lg p-4 space-y-4 mt-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 tracking-wider">
+              Upload tokens
+            </h2>
+            <button
+              onClick={generateUploadToken}
+              disabled={tokenBusy}
+              className="text-xs text-gray-300 hover:text-white border border-surface-3 px-3 py-1.5 rounded hover:bg-surface-2 transition-colors disabled:opacity-50"
+            >
+              {tokenBusy ? "Working" : "Generate"}
+            </button>
+          </div>
+
+          {createdToken ? (
+            <div className="border border-accent-green/40 bg-accent-green/5 rounded p-3 space-y-2">
+              <span className="text-[10px] uppercase text-accent-green tracking-wider">
+                New token
+              </span>
+              <div className="flex gap-2">
+                <input
+                  aria-label="New upload token"
+                  readOnly
+                  value={createdToken.token}
+                  className="min-w-0 flex-1 bg-surface-2 border border-surface-3 rounded px-3 py-2 text-xs text-gray-200 font-mono"
+                />
+                <button
+                  onClick={copyCreatedToken}
+                  className="text-xs text-gray-300 hover:text-white border border-surface-3 px-3 py-1.5 rounded hover:bg-surface-2 transition-colors"
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {tokenError ? <p className="text-[10px] text-accent-red">{tokenError}</p> : null}
+
+          <div className="divide-y divide-surface-3 border border-surface-3 rounded">
+            {uploadTokens.length === 0 ? (
+              <div className="px-3 py-3 text-xs text-gray-600">
+                No upload tokens.
+              </div>
+            ) : (
+              uploadTokens.map((token) => (
+                <div key={token.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="font-mono text-xs text-gray-300 truncate">
+                      {token.token_preview}
+                    </div>
+                    <div className="text-[10px] text-gray-600">
+                      {new Date(token.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeUploadToken(token.id)}
+                    disabled={tokenBusy}
+                    className="text-xs text-gray-500 hover:text-accent-red transition-colors px-2 py-1 rounded hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

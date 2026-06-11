@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env, SessionRow } from "../types";
-import { resolveUser } from "../auth";
+import { resolveRequestUser } from "../auth";
 import { inferStatus } from "../status";
 
 export const sessions = new Hono<{ Bindings: Env }>();
@@ -68,9 +68,9 @@ async function refreshStatuses(db: D1Database, userId: string, staleSec: number)
 sessions.get("/sessions/live", async (c) => {
   let userId: string;
   try {
-    userId = resolveUser(c.env, c.req.header("Authorization") ?? null);
+    userId = await resolveRequestUser(c.env, c.req.raw);
   } catch {
-    return c.json({ detail: "Unknown token" }, 401);
+    return c.json({ detail: "Authentication required" }, 401);
   }
 
   await refreshStatuses(c.env.DB, userId, staleSeconds(c.env));
@@ -89,9 +89,9 @@ sessions.get("/sessions/live", async (c) => {
 sessions.get("/sessions", async (c) => {
   let userId: string;
   try {
-    userId = resolveUser(c.env, c.req.header("Authorization") ?? null);
+    userId = await resolveRequestUser(c.env, c.req.raw);
   } catch {
-    return c.json({ detail: "Unknown token" }, 401);
+    return c.json({ detail: "Authentication required" }, 401);
   }
 
   await refreshStatuses(c.env.DB, userId, staleSeconds(c.env));
@@ -123,9 +123,9 @@ sessions.get("/sessions", async (c) => {
 sessions.get("/sessions/:sessionId", async (c) => {
   let userId: string;
   try {
-    userId = resolveUser(c.env, c.req.header("Authorization") ?? null);
+    userId = await resolveRequestUser(c.env, c.req.raw);
   } catch {
-    return c.json({ detail: "Unknown token" }, 401);
+    return c.json({ detail: "Authentication required" }, 401);
   }
 
   const sessionId = c.req.param("sessionId");
@@ -145,9 +145,9 @@ sessions.get("/sessions/:sessionId", async (c) => {
 sessions.delete("/sessions/:sessionId", async (c) => {
   let userId: string;
   try {
-    userId = resolveUser(c.env, c.req.header("Authorization") ?? null);
+    userId = await resolveRequestUser(c.env, c.req.raw);
   } catch {
-    return c.json({ detail: "Unknown token" }, 401);
+    return c.json({ detail: "Authentication required" }, 401);
   }
 
   const sessionId = c.req.param("sessionId");
@@ -173,9 +173,9 @@ sessions.delete("/sessions/:sessionId", async (c) => {
 sessions.get("/sessions/:sessionId/events", async (c) => {
   let userId: string;
   try {
-    userId = resolveUser(c.env, c.req.header("Authorization") ?? null);
+    userId = await resolveRequestUser(c.env, c.req.raw);
   } catch {
-    return c.json({ detail: "Unknown token" }, 401);
+    return c.json({ detail: "Authentication required" }, 401);
   }
 
   const sessionId = c.req.param("sessionId");
