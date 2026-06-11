@@ -97,6 +97,82 @@ describe("local daemon", () => {
     assert.equal(received[0].body.events[0].session_id, "sess-daemon");
   });
 
+  it("enriches raw hook events with Codex pin, title, and automation metadata before upload", async () => {
+    const received = [];
+    const remote = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+      });
+      req.on("end", () => {
+        received.push({
+          url: req.url,
+          auth: req.headers.authorization,
+          body: JSON.parse(raw),
+        });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ events: [{ event_id: "evt-raw", session_id: "sess-raw", status: "running" }] }));
+      });
+    });
+    const remoteAddress = await listen(remote);
+    servers.push(() => closeServer(remote));
+
+    const home = await tempHome();
+    const codexHome = await fs.mkdtemp(path.join(os.tmpdir(), "runlight-codex-home-"));
+    await fs.writeFile(
+      path.join(codexHome, "session_index.jsonl"),
+      `${JSON.stringify({ id: "sess-raw", thread_name: "Pinned deployment flow\nextra text" })}\n`,
+    );
+    await fs.writeFile(
+      path.join(codexHome, ".codex-global-state.json"),
+      `${JSON.stringify({ "pinned-thread-ids": ["sess-raw"] })}\n`,
+    );
+
+    const env = { ...process.env, RUNLIGHT_HOME: home, CODEX_HOME: codexHome };
+    const config = defaultConfig(env);
+    config.server_url = `http://127.0.0.1:${remoteAddress.port}`;
+    config.upload_token = "upload-token";
+    config.daemon.port = 0;
+    await saveConfig(config, env);
+
+    const daemon = await createDaemonServer({ env });
+    servers.push(() => daemon.close());
+
+    const response = await fetch(`http://127.0.0.1:${daemon.server.address().port}/events/raw`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify({
+        agent: "codex",
+        input: {
+          hook_event_name: "PreToolUse",
+          session_id: "sess-raw",
+          tool_name: "Bash",
+          tool_input: { command: "npm test\nsecond line" },
+          automation: { automated: true, source: "scheduled-run" },
+          cwd: process.cwd(),
+        },
+      }),
+    });
+    assert.equal(response.status, 202);
+
+    await daemon.flush();
+    assert.equal(received.length, 1);
+    const event = received[0].body.events[0];
+    assert.equal(received[0].url, "/api/events");
+    assert.equal(received[0].auth, "Bearer upload-token");
+    assert.equal(event.session_id, "sess-raw");
+    assert.equal(event.session_name, "Pinned deployment flow");
+    assert.equal(event.session_pin, true);
+    assert.equal(event.event_type, "command.started");
+    assert.equal(event.adapter_version, "0.3.0");
+    assert.equal(event.payload.command_label, "npm test");
+    assert.equal(event.payload.automation.automated, true);
+    assert.equal(event.payload.automation.source, "scheduled-run");
+  });
+
   it("reports daemon status through the local authenticated endpoint", async () => {
     const home = await tempHome();
     const env = { ...process.env, RUNLIGHT_HOME: home };

@@ -1,8 +1,9 @@
 # Runlight Claude Code Plugin
 
 Records Claude Code lifecycle events through the local Runlight daemon. Claude
-hooks call `runlight hook claude`; the daemon queues events locally and uploads
-them to the configured Runlight server.
+hooks call `runlight hook claude`; the daemon maps raw hook payloads into
+Runlight protocol events, queues them locally, and uploads them to the
+configured Runlight server.
 
 ## Install
 

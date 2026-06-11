@@ -79,10 +79,12 @@ flowchart LR
   Viewers -->|"GET /api/sessions/*"| Servers
 ```
 
-Codex and Claude hooks never upload directly to the hosted server. They hand
-events to the local daemon, which stores them in `~/.runlight/queue` and uploads
-them with the user's dashboard-generated upload token. The same server and
-viewer contract works against both server implementations.
+Codex and Claude hooks never upload directly to the hosted server. They hand raw
+hook payloads to the local daemon, which maps them to Runlight protocol events,
+adds local metadata such as Codex titles, pinned state, and automation hints,
+stores them in `~/.runlight/queue`, and uploads them with the user's
+dashboard-generated upload token. The same server and viewer contract works
+against both server implementations.
 See [docs/architecture.md](docs/architecture.md) for the detailed component
 model and deployment boundaries.
 
@@ -189,8 +191,8 @@ RUNLIGHT_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/runlight-local/runlight/* |
 bash "$RUNLIGHT_PLUGIN_DIR/skills/runlight/scripts/install-codex-hook.sh"
 ```
 
-Codex events include session title and pinned-thread state when those local
-Codex state files are available.
+The local daemon adds Codex session title and pinned-thread state when those
+local Codex state files are available.
 
 ### Claude Code
 
@@ -465,7 +467,7 @@ swift run RunlightBar
   `runlight plugin codex` or the bundled hook installer after plugin install or
   update.
 - Codex and Claude hooks are fail-open and only call the local daemon. The
-  daemon owns token storage, queueing, retry, and upload.
+  daemon owns token storage, event enrichment, queueing, retry, and upload.
 - Do not expose the self-hosted server without TLS and an explicit token map.
 - No license file is currently present in this repository.
 

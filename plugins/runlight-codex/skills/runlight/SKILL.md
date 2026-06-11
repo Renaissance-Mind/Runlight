@@ -12,8 +12,9 @@ events without taking control of the agent session.
 ## Activation Model
 
 Runlight is daemon-first. Codex hooks must not upload directly to the hosted
-server. The hook command is `runlight hook codex`, which sends the event to the
-local daemon. The daemon owns token storage, queueing, retry, and upload.
+server. The hook command is `runlight hook codex`, which sends the raw hook
+payload to the local daemon. The daemon owns protocol mapping, token storage,
+queueing, retry, local metadata enrichment, and upload.
 
 The Codex plugin installation makes this skill and its packaged scripts
 available inside Codex. It does not automatically register lifecycle hooks or
@@ -60,8 +61,8 @@ runlight health
 Local settings live in `~/.runlight/config.json` unless `RUNLIGHT_HOME` is set.
 The upload token comes from the hosted dashboard Settings page.
 
-The Codex hook adapter also reads local Codex state files when available to
-attach `session_name` and `session_pin` to each Runlight event.
+The local daemon also reads Codex state files when available to attach
+`session_name` and `session_pin` to each Runlight event.
 
 ## Verify
 

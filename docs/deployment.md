@@ -92,60 +92,50 @@ RUNLIGHT_TOKEN_MAP='tok-alice:alice,tok-bob:bob'
 RUNLIGHT_CORS_ORIGINS='https://dashboard.example.com'
 ```
 
-## Configure Codex Hook Client
+## Configure The Local Daemon
 
-The Codex plugin stores connection settings next to its hook script:
-
-```json
-{
-  "server_url": "http://127.0.0.1:8766",
-  "token": ""
-}
-```
-
-For the local repository adapter, edit:
-
-```text
-/path/to/Runlight/adapters/codex-hook/settings.json
-```
-
-For the installed Codex plugin, edit:
-
-```text
-~/.codex/plugins/cache/runlight-local/runlight/<version>/skills/runlight/scripts/settings.json
-```
-
-Installing the Codex plugin makes the skill available; it does not itself write
-Codex lifecycle hooks. Run the packaged skill installer after plugin install or
-update:
+Codex and Claude hooks do not store server URL or upload tokens in hook scripts.
+Install and configure the npm CLI once on each machine:
 
 ```bash
-RUNLIGHT_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/runlight-local/runlight/* | head -1)"
-bash "$RUNLIGHT_PLUGIN_DIR/skills/runlight/scripts/install-codex-hook.sh"
+npm install -g runlight
+runlight login --server http://127.0.0.1:8766 --token <upload-token>
+runlight daemon start
 ```
 
-The repository adapter installer is for local development. It writes to
-`$CODEX_HOME/hooks.json` when `CODEX_HOME` is set, otherwise `~/.codex/hooks.json`.
+Use `runlight setting` for interactive configuration and `runlight status` or
+`runlight health` to verify the local queue, daemon, server, and plugin state.
+Local settings live in `~/.runlight/config.json` unless `RUNLIGHT_HOME` is set.
+
+## Configure Codex Hook Client
+
+Install Codex hooks through the local CLI:
+
+```bash
+runlight plugin codex
+```
+
+The installer writes lifecycle hook entries to `$CODEX_HOME/hooks.json` when
+`CODEX_HOME` is set, otherwise `~/.codex/hooks.json`. The hook command is
+`runlight hook codex`, which sends raw hook payloads to the local daemon. The
+daemon adds Codex session titles and pinned-thread state when the local Codex
+state files are available.
 
 ## Configure Claude Code Hook Client
 
-The Claude Code plugin declares a hook inventory in its plugin manifest, but the
-reliable local install path is still the packaged installer because current
-Claude Code plugin loading does not consistently register hooks from plugin
-metadata.
+Install Claude Code hooks through the local CLI:
 
 ```bash
-cd /path/to/Runlight/plugins/runlight-claude
-bash install.sh --server http://127.0.0.1:8766
+runlight plugin claude
 ```
 
-The installer writes hooks into `~/.claude/settings.json` and stores runtime
-connection options under `pluginConfigs`. The hook reads these keys, with
-`RUNLIGHT_SERVER_URL` and `RUNLIGHT_TOKEN` taking precedence.
+The installer writes hook entries into `~/.claude/settings.json` unless
+`CLAUDE_SETTINGS_FILE` is set. The hook command is `runlight hook claude`, which
+also sends raw hook payloads to the local daemon.
 
-The repository adapter under `adapters/claude-code-hook` is for local
-development. It stores connection settings in `adapters/claude-code-hook/settings.json`
-and can target a non-default Claude settings file with `CLAUDE_SETTINGS_FILE`.
+The packaged plugin manifests remain useful for marketplace and skill workflows,
+but runtime connection settings are still owned by `runlight login` and
+`runlight setting`.
 
 ## Configure Python Or Generic CLI Clients
 
@@ -159,25 +149,28 @@ export RUNLIGHT_TOKEN=
 The CLI wrapper is installed by the `runlight-adapter` package and exposes:
 
 ```bash
-runlight run --agent codex -- <command>
-runlight event --session <id> --type <event_type>
-runlight heartbeat --session <id>
-runlight finish --session <id> --result completed
+runlight-adapter run --agent generic -- <command>
+runlight-adapter event --session <id> --type <event_type>
+runlight-adapter heartbeat --session <id>
+runlight-adapter finish --session <id> --result completed
 ```
 
 Python clients send heartbeat, sequence, dedupe, and offline-queue metadata; the
-shell hook clients remain fail-open and best-effort.
+Codex and Claude hook commands remain fail-open and best-effort while the daemon
+handles retry.
 
 ## Configure Worker Server
 
 For the Cloudflare Worker deployment, viewers sign in with GitHub or Google
-OAuth and agent hooks upload with bearer tokens generated from the dashboard.
+OAuth and the local daemon uploads agent events with bearer tokens generated
+from the dashboard.
 After deploying, open the hosted dashboard, sign in, go to Settings, and create
-an upload token. Use that token with the same client contract:
+an upload token. Use that token to configure the daemon on each monitored
+machine:
 
 ```bash
-export RUNLIGHT_SERVER_URL=https://runlight.example.com
-export RUNLIGHT_TOKEN=<upload-token-from-settings>
+runlight login --server https://runlight.example.com --token <upload-token-from-settings>
+runlight daemon start
 ```
 
 `RUNLIGHT_TOKEN_MAP` with the same `token:user_id` value format as the FastAPI
@@ -199,12 +192,14 @@ show the active user.
 ## Configure Menubar
 
 The macOS menubar app stores its own runtime connection in UserDefaults. Its
-server URL and token are independent from the dashboard and agent hook settings.
+server URL and token are independent from the dashboard and local daemon
+settings.
 
 ## Configuration Boundaries
 
-Agent hooks, dashboard, menubar, and server deployment each keep their own
-connection settings. Changing the dashboard URL/token does not update existing
-hooks, and changing a hook settings file does not update dashboard or menubar
-clients. When moving between local FastAPI, LAN, and Worker deployments, update
-all active surfaces that should point at the new server.
+The local daemon, dashboard, menubar, and server deployment each keep their own
+connection settings. Changing the dashboard URL/token does not update the local
+daemon, and changing `~/.runlight/config.json` does not update dashboard or
+menubar clients. Hook commands stay stable as `runlight hook codex` and
+`runlight hook claude`. When moving between local FastAPI, LAN, and Worker
+deployments, update all active surfaces that should point at the new server.

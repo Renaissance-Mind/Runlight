@@ -5,8 +5,8 @@ plugin makes the Runlight skill and packaged scripts available in Codex; it does
 not automatically modify global Codex hooks.
 
 Runtime collection is daemon-first. Codex hooks call `runlight hook codex`, the
-local daemon queues events under `~/.runlight/queue`, and the daemon uploads to
-the configured Runlight server.
+local daemon maps raw hook payloads into Runlight protocol events, queues them
+under `~/.runlight/queue`, and uploads to the configured Runlight server.
 
 Install from the repo marketplace:
 

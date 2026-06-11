@@ -4,14 +4,15 @@
 
 Runlight is a passive observability system for AI coding agents. It records lifecycle events (session start/end, tool use, prompts, completions) and provides real-time visibility into agent activity.
 
-The system has three layers:
+The system has four runtime layers:
 
 ```
-Client  ──▶  Server  ◀──  Viewer
-(collect)    (store)      (display)
+Client  ──▶  Local daemon  ──▶  Server  ◀──  Viewer
+(collect)    (enrich/queue)    (store)      (display)
 ```
 
-- **Client**: Adapters/plugins installed inside each agent, collecting and reporting events.
+- **Client**: Adapters/plugins installed inside each agent, collecting lifecycle signals.
+- **Local daemon**: Receives raw Codex and Claude hook payloads, enriches them, queues them durably, and uploads them.
 - **Server**: Receives, stores, and queries events via a REST API.
 - **Viewer**: Displays agent activity. Multiple viewer types share the same server API.
 
@@ -19,17 +20,25 @@ Client  ──▶  Server  ◀──  Viewer
 
 ### Client
 
-Plugins that hook into agent lifecycle events and POST them to the server.
+Plugins that hook into agent lifecycle events and send raw payloads to the local
+Runlight daemon.
 
 | Agent | Plugin Location | Install Method |
 |---|---|---|
-| Claude Code | `plugins/runlight-claude/` | Plugin marketplace or `install.sh` |
-| Codex CLI | `plugins/runlight-codex/` | `install-codex-hook.sh` |
+| Claude Code | `plugins/runlight-claude/` | `runlight plugin claude` or `install.sh` |
+| Codex CLI | `plugins/runlight-codex/` | `runlight plugin codex` or `install-codex-hook.sh` |
 
-All clients share the same contract:
-- Report events to `POST /api/events`
-- Authenticate with `Authorization: Bearer <token>` (optional)
-- Installation is identical for both deployment modes; only configuration differs (see below)
+Codex and Claude hooks share the same local contract:
+- Run `runlight hook codex` or `runlight hook claude`
+- POST raw hook payloads to the daemon's authenticated `POST /events/raw`
+- Keep hosted server URL and upload token out of hook commands
+
+The daemon maps raw hook payloads into protocol events, attaches local metadata
+such as session titles, pinned state, workspace, machine, and automation hints,
+then uploads batches to the server's `POST /api/events`.
+
+Python and custom adapters can either upload standard protocol events directly
+to `POST /api/events` or run beside the daemon, depending on deployment needs.
 
 ### Server
 

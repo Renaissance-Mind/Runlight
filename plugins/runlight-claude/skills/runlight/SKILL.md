@@ -7,7 +7,8 @@ description: Configure or troubleshoot Runlight passive observability for Claude
 
 Use this skill when the user asks about Runlight integration for Claude Code.
 Runlight is daemon-first: Claude hooks call `runlight hook claude`, the local
-daemon queues events, and the daemon uploads to the configured Runlight server.
+daemon maps raw hook payloads into Runlight protocol events, queues them, and
+uploads to the configured Runlight server.
 
 ## Configure
 

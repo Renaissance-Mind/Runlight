@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadConfig, loadOrCreateConfig, redactConfig } from "./config.js";
+import { enrichRawHookEvents } from "./enrich.js";
 import { ensureRuntimeDirs, localDaemonUrl, resolvePaths } from "./paths.js";
 
 const MAX_BATCH_EVENTS = 50;
@@ -34,6 +35,11 @@ function requestHasLocalSecret(req, config) {
 }
 
 function normalizeEvents(body) {
+  if (Array.isArray(body?.events)) return body.events;
+  return [body];
+}
+
+function normalizeRawHookEvents(body) {
   if (Array.isArray(body?.events)) return body.events;
   return [body];
 }
@@ -219,6 +225,20 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
     if (req.method === "POST" && url.pathname === "/events") {
       const body = await readJsonRequest(req);
       const events = normalizeEvents(body);
+      const queued = await enqueueEvents(paths, events);
+      scheduleFlush();
+      jsonResponse(res, 202, { status: "queued", count: queued.count, pending_count: await countPending(paths) });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/events/raw") {
+      const body = await readJsonRequest(req);
+      const rawEvents = normalizeRawHookEvents(body);
+      const events = await enrichRawHookEvents(rawEvents, freshConfig, env);
+      if (events.length === 0) {
+        jsonResponse(res, 202, { status: "ignored", count: 0, pending_count: await countPending(paths) });
+        return;
+      }
       const queued = await enqueueEvents(paths, events);
       scheduleFlush();
       jsonResponse(res, 202, { status: "queued", count: queued.count, pending_count: await countPending(paths) });
