@@ -93,6 +93,21 @@ describe("dashboard server connection config", () => {
     );
   });
 
+  it("normalizes pasted API and dashboard URLs back to the server root", () => {
+    assert.equal(
+      buildApiUrl("https://runlight.example.com/api/health", "/health"),
+      "https://runlight.example.com/api/health",
+    );
+    assert.equal(
+      buildApiUrl("https://runlight.example.com/server/api/health", "/health"),
+      "https://runlight.example.com/server/api/health",
+    );
+    assert.equal(
+      buildApiUrl("https://runlight.example.com/settings", "/tokens"),
+      "https://runlight.example.com/api/tokens",
+    );
+  });
+
   it("builds OAuth login URLs from the configured server origin", () => {
     assert.equal(
       buildAuthLoginUrl("https://runlight.example.com/", "github", "/messages"),

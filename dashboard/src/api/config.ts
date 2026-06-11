@@ -16,7 +16,34 @@ const LEGACY_DASHBOARD_CONFIG_STORAGE_KEY = "agent-monitor.dashboard.connection"
 function normalizeServerUrl(serverUrl: string): string {
   const trimmed = serverUrl.trim();
   if (!trimmed) return "http://127.0.0.1:8766";
-  return trimmed.replace(/\/+$/, "");
+  const withoutTrailingSlash = trimmed.replace(/\/+$/, "");
+
+  try {
+    const url = new URL(withoutTrailingSlash);
+    const segments = url.pathname.split("/").filter(Boolean);
+    const apiIndex = segments.indexOf("api");
+    if (apiIndex >= 0) {
+      url.pathname = `/${segments.slice(0, apiIndex).join("/")}`.replace(/\/+$/, "");
+      url.search = "";
+      url.hash = "";
+      return url.toString().replace(/\/+$/, "");
+    }
+
+    if (
+      url.pathname === "/settings"
+      || url.pathname === "/messages"
+      || url.pathname.startsWith("/sessions/")
+    ) {
+      url.pathname = "";
+      url.search = "";
+      url.hash = "";
+      return url.toString().replace(/\/+$/, "");
+    }
+  } catch {
+    return withoutTrailingSlash;
+  }
+
+  return withoutTrailingSlash;
 }
 
 function importMetaEnv(): DashboardConfigEnv {

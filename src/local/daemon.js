@@ -170,13 +170,20 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
 
   let flushTimer = null;
   let flushPromise = null;
+  let flushRequested = false;
 
   async function scheduleFlush() {
-    if (flushPromise) return flushPromise;
+    if (flushPromise) {
+      flushRequested = true;
+      return flushPromise;
+    }
     flushPromise = (async () => {
       try {
-        const freshConfig = await loadConfig(env);
-        await flushPending({ config: freshConfig, paths, fetchImpl });
+        do {
+          flushRequested = false;
+          const freshConfig = await loadConfig(env);
+          await flushPending({ config: freshConfig, paths, fetchImpl });
+        } while (flushRequested);
       } finally {
         flushPromise = null;
       }

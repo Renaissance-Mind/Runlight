@@ -5,7 +5,34 @@ import { DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT, DEFAULT_SERVER_URL, ensureRun
 export function normalizeServerUrl(value) {
   const trimmed = String(value || "").trim();
   if (!trimmed) return DEFAULT_SERVER_URL;
-  return trimmed.replace(/\/+$/, "");
+  const withoutTrailingSlash = trimmed.replace(/\/+$/, "");
+
+  try {
+    const url = new URL(withoutTrailingSlash);
+    const segments = url.pathname.split("/").filter(Boolean);
+    const apiIndex = segments.indexOf("api");
+    if (apiIndex >= 0) {
+      url.pathname = `/${segments.slice(0, apiIndex).join("/")}`.replace(/\/+$/, "");
+      url.search = "";
+      url.hash = "";
+      return url.toString().replace(/\/+$/, "");
+    }
+
+    if (
+      url.pathname === "/settings"
+      || url.pathname === "/messages"
+      || url.pathname.startsWith("/sessions/")
+    ) {
+      url.pathname = "";
+      url.search = "";
+      url.hash = "";
+      return url.toString().replace(/\/+$/, "");
+    }
+  } catch {
+    return withoutTrailingSlash;
+  }
+
+  return withoutTrailingSlash;
 }
 
 function generateSecret(prefix) {

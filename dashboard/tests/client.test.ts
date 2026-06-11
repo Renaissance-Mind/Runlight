@@ -23,6 +23,12 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (req.url === "/html/api/health") {
+    res.setHeader("Content-Type", "text/html");
+    res.end("<!doctype html><html><body>Runlight</body></html>");
+    return;
+  }
+
   if (req.url === "/api/users/current") {
     res.end(JSON.stringify({ user_id: lastAuthorization ? "user-alice" : "default" }));
     return;
@@ -102,6 +108,14 @@ describe("dashboard runtime API client", () => {
     assert.equal(probe.tokenConfigured, false);
     assert.equal(typeof probe.checkedAt, "string");
     assert.equal(probe.error, null);
+  });
+
+  it("reports HTML responses as server URL mistakes instead of JSON parser errors", async () => {
+    const probe = await probeServerConnection({ serverUrl: `${serverUrl}/html`, token: "" });
+
+    assert.equal(probe.ok, false);
+    assert.match(probe.error ?? "", /API returned HTML instead of JSON/);
+    assert.doesNotMatch(probe.error ?? "", /Unexpected token/);
   });
 
   it("deletes a session with the configured token", async () => {

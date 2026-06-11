@@ -11,7 +11,8 @@ async function fetchJSON<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const resp = await fetch(buildApiUrl(config.serverUrl, path), {
+  const url = buildApiUrl(config.serverUrl, path);
+  const resp = await fetch(url, {
     ...init,
     credentials: "include",
     headers: {
@@ -19,10 +20,31 @@ async function fetchJSON<T>(
       ...init?.headers,
     },
   });
-  if (!resp.ok) {
-    throw new Error(`API ${resp.status}: ${resp.statusText}`);
+
+  const text = await resp.text();
+  let data: unknown = null;
+  if (text.trim()) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      const preview = text.trim().slice(0, 80).replace(/\s+/g, " ");
+      const looksLikeHtml = /^<!doctype html/i.test(preview) || /^<html/i.test(preview);
+      if (looksLikeHtml) {
+        throw new Error(
+          `API returned HTML instead of JSON at ${url}. Check Server URL; use the Runlight server origin, not a dashboard route or /api endpoint.`,
+        );
+      }
+      throw new Error(`API returned non-JSON response at ${url}: ${preview}`);
+    }
   }
-  return resp.json() as Promise<T>;
+
+  if (!resp.ok) {
+    const detail = typeof data === "object" && data && "detail" in data
+      ? String((data as { detail: unknown }).detail)
+      : resp.statusText;
+    throw new Error(`API ${resp.status}: ${detail}`);
+  }
+  return data as T;
 }
 
 const defaultConfig = resolveDashboardConfig();
