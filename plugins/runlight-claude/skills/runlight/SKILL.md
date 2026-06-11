@@ -6,25 +6,42 @@ description: Configure or troubleshoot Runlight passive observability for Claude
 # Runlight
 
 Use this skill when the user asks about Runlight integration for Claude Code.
-The plugin records lifecycle events passively through `hooks/hooks.json` and the
-packaged `scripts/runlight-hook.sh` script.
+Runlight is daemon-first: Claude hooks call `runlight hook claude`, the local
+daemon queues events, and the daemon uploads to the configured Runlight server.
 
 ## Configure
 
-The plugin prompts for:
+Preferred user path:
 
-- `server_url`: the Runlight server endpoint, defaulting to
-  `http://127.0.0.1:8766`
-- `token`: optional bearer token for the Runlight ingest API
+```bash
+npm install -g runlight
+runlight onboarding
+```
 
-Prefer plugin user configuration over hard-coding secrets in hook commands.
+Claude-only hook installation:
+
+```bash
+runlight plugin claude
+```
+
+Do not put the hosted server URL or upload token in Claude hook commands. Use:
+
+```bash
+runlight login
+runlight setting
+runlight status
+runlight health
+```
+
+Local settings live in `~/.runlight/config.json` unless `RUNLIGHT_HOME` is set.
 
 ## Verify
 
-1. Run `/plugin details runlight@runlight-local` to inspect the
-   bundled hook inventory.
-2. Run `/reload-plugins` after changing plugin state.
-3. Start a fresh Claude Code session and check the Runlight dashboard for a
+1. Run `runlight status`.
+2. Run `/plugin details runlight@runlight-local` to inspect bundled hook
+   metadata if the plugin was installed through Claude's plugin system.
+3. Run `/reload-plugins` after changing plugin state.
+4. Start a fresh Claude Code session and check the Runlight dashboard for a
    `claude-code-hook` session.
 
 Do not mock hook events unless the user explicitly asks for a synthetic test.

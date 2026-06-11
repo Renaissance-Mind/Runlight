@@ -16,6 +16,18 @@ def _make_event(**overrides) -> dict:
 
 
 class TestIngestSingleEvent:
+    async def test_ingest_health_uses_resolved_user(self, client):
+        resp = await client.get(
+            "/api/ingest/health",
+            headers={"Authorization": "Bearer test-token-1"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "status": "ok",
+            "service": "runlight-ingest",
+            "user_id": "user-alice",
+        }
+
     async def test_ingest_no_token_default_user(self, client):
         resp = await client.post("/api/events", json=_make_event())
         assert resp.status_code == 200

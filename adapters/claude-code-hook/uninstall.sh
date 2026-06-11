@@ -1,23 +1,17 @@
 #!/bin/bash
-# Remove Runlight hooks from Claude Code settings.json
+# Remove Runlight hooks from Claude Code.
 set -e
 
-CLAUDE_SETTINGS="${CLAUDE_SETTINGS_FILE:-${HOME}/.claude/settings.json}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_CLI="${SCRIPT_DIR}/../../bin/runlight.js"
 
-if [ ! -f "$CLAUDE_SETTINGS" ]; then
-  echo "No settings.json found"
-  exit 0
+if command -v runlight >/dev/null 2>&1; then
+  exec runlight plugin claude --uninstall
 fi
 
-echo "Removing Runlight hooks from Claude Code..."
+if [ -f "$REPO_CLI" ]; then
+  exec node "$REPO_CLI" plugin claude --uninstall
+fi
 
-tmp=$(mktemp)
-jq '
-  .hooks |= with_entries(
-    .value |= map(
-      select(.hooks | all(.command | test("runlight-hook.sh|agent-monitor-hook.sh") | not))
-    )
-  )
-' "$CLAUDE_SETTINGS" > "$tmp" && mv "$tmp" "$CLAUDE_SETTINGS"
-
-echo "Done."
+echo "Error: runlight CLI not found." >&2
+exit 1

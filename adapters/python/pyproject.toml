@@ -18,7 +18,7 @@ dev = [
 ]
 
 [project.scripts]
-runlight = "runlight_adapter.cli:main"
+runlight-adapter = "runlight_adapter.cli:main"
 agent-monitor = "runlight_adapter.cli:main"
 
 [tool.pytest.ini_options]

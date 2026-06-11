@@ -13,6 +13,15 @@ function staleSeconds(env: Env): number {
   return parseInt(env.HEARTBEAT_STALE_SECONDS || "120", 10);
 }
 
+ingest.get("/ingest/health", async (c) => {
+  try {
+    const userId = await resolveRequestUser(c.env, c.req.raw);
+    return c.json({ status: "ok", service: "runlight-ingest", user_id: userId });
+  } catch {
+    return c.json({ detail: "Authentication required" }, 401);
+  }
+});
+
 async function storeEvent(
   db: D1Database,
   envelope: EventEnvelope,

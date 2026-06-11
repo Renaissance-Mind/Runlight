@@ -22,6 +22,11 @@ def _event_response(event, session) -> dict:
     }
 
 
+@router.get("/ingest/health")
+async def ingest_health(user_id: str = Depends(resolve_user)):
+    return {"status": "ok", "service": "runlight-ingest", "user_id": user_id}
+
+
 @router.post("/events")
 async def ingest_events(
     body: EventEnvelope | EventBatch,

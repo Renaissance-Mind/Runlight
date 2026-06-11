@@ -1,11 +1,14 @@
 # Runlight - Cloudflare Workers + D1
 
-Serverless deployment of Runlight on Cloudflare. API-compatible with the Python/FastAPI server — just point your dashboard/menubar/hooks to the Worker URL instead.
+Serverless deployment of Runlight on Cloudflare. API-compatible with the
+Python/FastAPI server. Hosted users sign in to the dashboard with GitHub or
+Google, generate an upload token, and configure the local npm CLI/daemon to
+upload agent events.
 
 ## Prerequisites
 
 - [Cloudflare account](https://dash.cloudflare.com/sign-up) (free plan works)
-- Node.js 18+
+- Node.js 20+
 - `npm install` in this directory
 
 ## Deployment Steps
@@ -94,16 +97,21 @@ Your API is now live at `https://runlight.<your-subdomain>.workers.dev`
 
 ## Usage
 
-Point your agent hooks and dashboard to the Worker URL:
+Open the dashboard, sign in, and create an upload token in Settings. Then
+configure the local daemon:
 
 ```bash
-# Dashboard
-Open https://runlight.YOUR.workers.dev and sign in with GitHub or Google.
-Create an upload token in Settings.
+npm install -g runlight
+runlight login --server https://runlight.YOUR.workers.dev
+runlight daemon start
+runlight plugin codex
+runlight plugin claude
+runlight status
+runlight health
+```
 
-# Hook adapter
-export RUNLIGHT_SERVER_URL=https://runlight.YOUR.workers.dev
-export RUNLIGHT_TOKEN=<upload-token-from-settings>
+Hooks do not upload directly to the Worker. Codex and Claude Code hooks call the
+local daemon; the daemon queues and uploads to `POST /api/events`.
 ```
 
 ## Local Development
@@ -121,6 +129,7 @@ npx wrangler d1 migrations apply runlight-db --local
 All endpoints match the Python server exactly:
 
 - `GET /api/health` — Health check
+- `GET /api/ingest/health` — Bearer-token ingest credential check
 - `GET /api/users/current` — Current user from token
 - `GET /api/sessions/live` — Live (non-terminal + pinned) sessions
 - `GET /api/sessions` — All sessions (with `?agent_type=`, `?status=`, `?limit=`, `?offset=`)

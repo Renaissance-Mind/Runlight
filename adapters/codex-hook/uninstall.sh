@@ -1,24 +1,17 @@
 #!/bin/bash
-# Remove Runlight hooks from Codex hooks.json
+# Remove Runlight hooks from Codex.
 set -e
 
-CODEX_HOME_DIR="${CODEX_HOME:-${HOME}/.codex}"
-CODEX_HOOKS_JSON="${CODEX_HOME_DIR}/hooks.json"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_CLI="${SCRIPT_DIR}/../../bin/runlight.js"
 
-if [ ! -f "$CODEX_HOOKS_JSON" ]; then
-  echo "No hooks.json found"
-  exit 0
+if command -v runlight >/dev/null 2>&1; then
+  exec runlight plugin codex --uninstall
 fi
 
-echo "Removing Runlight hooks from Codex..."
+if [ -f "$REPO_CLI" ]; then
+  exec node "$REPO_CLI" plugin codex --uninstall
+fi
 
-tmp=$(mktemp)
-jq '
-  .hooks |= with_entries(
-    .value |= map(
-      select(.hooks | all(.command | test("runlight-hook.sh|agent-monitor-hook.sh") | not))
-    ) | select(length > 0)
-  )
-' "$CODEX_HOOKS_JSON" > "$tmp" && mv "$tmp" "$CODEX_HOOKS_JSON"
-
-echo "Done."
+echo "Error: runlight CLI not found." >&2
+exit 1

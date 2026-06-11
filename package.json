@@ -1,0 +1,29 @@
+{
+  "name": "runlight",
+  "version": "0.1.0",
+  "description": "Local daemon and CLI for forwarding agent lifecycle events to Runlight.",
+  "type": "module",
+  "bin": {
+    "runlight": "./bin/runlight.js"
+  },
+  "scripts": {
+    "test": "node --test tests/local/*.test.mjs",
+    "verify": "npm test"
+  },
+  "files": [
+    "bin/",
+    "src/local/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "runlight",
+    "agent",
+    "monitoring",
+    "codex",
+    "claude"
+  ],
+  "license": "UNLICENSED"
+}

@@ -1,27 +1,46 @@
 # Runlight Claude Code Plugin
 
-Records Claude Code lifecycle events (session start/end, tool use, prompts)
-and sends them to the Runlight server for observability.
+Records Claude Code lifecycle events through the local Runlight daemon. Claude
+hooks call `runlight hook claude`; the daemon queues events locally and uploads
+them to the configured Runlight server.
 
 ## Install
 
-```bash
-# Register hooks into ~/.claude/settings.json
-bash install.sh --server http://127.0.0.1:8766
+Preferred user path:
 
-# Restart Claude Code for hooks to take effect
+```bash
+npm install -g runlight
+runlight onboarding
 ```
 
+Claude-only hook installation:
+
+```bash
+runlight plugin claude
+```
+
+From this plugin directory:
+
+```bash
+bash install.sh
+```
+
+Restart Claude Code for hooks to take effect.
+
 ## Uninstall
+
+```bash
+runlight plugin claude --uninstall
+```
+
+or:
 
 ```bash
 bash install.sh --uninstall
 ```
 
-## Why keep a manual install step?
+## Notes
 
-The plugin manifest declares the hook inventory for clients that support plugin
-hook metadata. The install script remains the reliable path for local use: it
-writes hooks directly into `~/.claude/settings.json`, stores server/token options
-under `pluginConfigs`, and marks hook calls async so monitoring cannot block
-Claude Code.
+The plugin manifest declares hook metadata for clients that support plugin hook
+discovery. Runtime server URL and upload token are configured with
+`runlight login` or `runlight onboarding`, not inside Claude hook commands.

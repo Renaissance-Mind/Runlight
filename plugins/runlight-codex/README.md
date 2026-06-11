@@ -1,45 +1,45 @@
 # Runlight Codex Plugin
 
-This package installs the Runlight Codex integration workflow. Installing
-the plugin makes the Runlight skill and packaged scripts available in Codex;
-it does not automatically modify global Codex hooks. The current integration
-records events through Codex lifecycle hooks after the hook installer is run.
+This package installs the Runlight Codex integration workflow. Installing the
+plugin makes the Runlight skill and packaged scripts available in Codex; it does
+not automatically modify global Codex hooks.
 
-Each Codex event includes `session_name` from the local Codex thread title and
-`session_pin` from the local Codex pinned-thread state when those files are
-available.
+Runtime collection is daemon-first. Codex hooks call `runlight hook codex`, the
+local daemon queues events under `~/.runlight/queue`, and the daemon uploads to
+the configured Runlight server.
 
 Install from the repo marketplace:
 
 ```bash
-codex plugin marketplace add /Users/caopu/workspace/Runlight
+codex plugin marketplace add /path/to/Runlight
 codex plugin add runlight@runlight-local
 ```
 
-Start a new Codex thread after installation so the bundled skill is loaded.
-Then activate monitoring by running the bundled hook installer from the installed
-plugin cache. This writes lifecycle hooks into `$CODEX_HOME/hooks.json` or
-`~/.codex/hooks.json` and stores editable connection settings next to the hook
-script.
+Then install and configure the local npm CLI:
 
-Default server URL:
-
-```text
-http://127.0.0.1:8766
+```bash
+npm install -g runlight
+runlight onboarding
 ```
 
-Activation command:
+To install only the Codex hook:
+
+```bash
+runlight plugin codex
+```
+
+The installer writes lifecycle hooks into `$CODEX_HOME/hooks.json` or
+`~/.codex/hooks.json`. The hook command is `runlight hook codex`; server URL and
+upload token live in `~/.runlight/config.json`, not in the hook command.
+
+If you are using the packaged skill script directly:
 
 ```bash
 RUNLIGHT_PLUGIN_DIR="$(ls -td ~/.codex/plugins/cache/runlight-local/runlight/* | head -1)"
 bash "$RUNLIGHT_PLUGIN_DIR/skills/runlight/scripts/install-codex-hook.sh"
 ```
 
-If Runlight does not update after the plugin is installed, check hook
-activation first. The hook installer must have written Runlight entries into
-Codex's hooks file, hooks must be enabled, and the Codex app must trust hooks for
-this workspace in Settings before lifecycle events are emitted.
-
-Plugin installation makes the Runlight skill available; hook installation is
-the step that starts event collection. Re-running the installer replaces older
-Runlight hook entries that point at previous plugin cache paths.
+If Runlight does not update after the plugin is installed, run `runlight status`
+first. The hook installer must have written Runlight entries into Codex's hooks
+file, hooks must be enabled, the local daemon must be running, and Codex must
+trust hooks for the workspace before lifecycle events are emitted.

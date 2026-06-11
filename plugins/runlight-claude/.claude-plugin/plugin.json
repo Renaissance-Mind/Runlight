@@ -16,21 +16,5 @@
     "monitoring"
   ],
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
-  "userConfig": {
-    "server_url": {
-      "type": "string",
-      "title": "Runlight server URL",
-      "description": "HTTP endpoint for the Runlight server.",
-      "default": "http://127.0.0.1:8766",
-      "required": false
-    },
-    "token": {
-      "type": "string",
-      "title": "Runlight bearer token",
-      "description": "Optional API token for Runlight ingest.",
-      "sensitive": true,
-      "required": false
-    }
-  }
+  "hooks": "./hooks/hooks.json"
 }

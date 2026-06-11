@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 18+">
+  <img src="https://img.shields.io/badge/Node.js-20%2B-339933?logo=nodedotjs&logoColor=white" alt="Node.js 20+">
   <img src="https://img.shields.io/badge/Cloudflare-Workers%20%2B%20D1-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare Workers and D1">
   <img src="https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white" alt="macOS 14+">
 </p>
@@ -36,7 +36,9 @@ custom clients.
 
 ## Features
 
-- Passive hook ingestion for Codex and Claude Code
+- Daemon-first local ingestion for Codex and Claude Code
+- npm-installed `runlight` CLI with onboarding, login, status, health, settings, and plugin installation commands
+- Local durable queue for hook events before upload
 - Shared event protocol for all agent adapters
 - Live session status inference from real events and heartbeats
 - Project-grouped dashboard with session pins, branches, machines, and paths
@@ -51,9 +53,10 @@ custom clients.
 
 ```mermaid
 flowchart LR
-  subgraph Clients
+  subgraph Local
     Codex["Codex hook"]
     Claude["Claude Code hook"]
+    Daemon["Runlight local daemon<br/>127.0.0.1:18766"]
     Python["Python / CLI adapter"]
     Custom["Custom adapter"]
   end
@@ -68,11 +71,18 @@ flowchart LR
     Menubar["macOS menu bar"]
   end
 
-  Clients -->|"POST /api/events"| Servers
+  Codex -->|"runlight hook codex"| Daemon
+  Claude -->|"runlight hook claude"| Daemon
+  Daemon -->|"POST /api/events"| Servers
+  Python -->|"POST /api/events"| Servers
+  Custom -->|"POST /api/events"| Servers
   Viewers -->|"GET /api/sessions/*"| Servers
 ```
 
-The same client and viewer contract works against both server implementations.
+Codex and Claude hooks never upload directly to the hosted server. They hand
+events to the local daemon, which stores them in `~/.runlight/queue` and uploads
+them with the user's dashboard-generated upload token. The same server and
+viewer contract works against both server implementations.
 See [docs/architecture.md](docs/architecture.md) for the detailed component
 model and deployment boundaries.
 
@@ -84,8 +94,9 @@ model and deployment boundaries.
 | [workers/](workers/) | Cloudflare Workers + D1 API-compatible server |
 | [dashboard/](dashboard/) | React dashboard and Tauri desktop wrapper |
 | [menubar/](menubar/) | Swift macOS menu bar viewer |
-| [adapters/codex-hook/](adapters/codex-hook/) | Local-development Codex hook installer and script |
-| [adapters/claude-code-hook/](adapters/claude-code-hook/) | Local-development Claude Code hook installer and script |
+| [bin/](bin/) and [src/local/](src/local/) | npm `runlight` CLI, local daemon, queue, settings, and hook adapters |
+| [adapters/codex-hook/](adapters/codex-hook/) | Compatibility installer and shim for Codex hooks |
+| [adapters/claude-code-hook/](adapters/claude-code-hook/) | Compatibility installer and shim for Claude Code hooks |
 | [adapters/python/](adapters/python/) | Python client library and `runlight` CLI |
 | [plugins/runlight-codex/](plugins/runlight-codex/) | Packaged Codex plugin |
 | [plugins/runlight-claude/](plugins/runlight-claude/) | Packaged Claude Code plugin |
@@ -93,10 +104,51 @@ model and deployment boundaries.
 
 ## Quick Start
 
-This starts the local FastAPI server, the web dashboard, and one agent hook
-client. You need Python 3.11+, Node.js 18+, npm, and `jq`.
+For the hosted Cloudflare deployment, the normal user path is the npm CLI plus a
+dashboard-generated upload token. You need Node.js 20+ and npm.
 
-### 1. Start the API server
+### 1. Install the local CLI
+
+```bash
+npm install -g runlight
+```
+
+From a source checkout, use:
+
+```bash
+npm install -g .
+```
+
+### 2. Login and start the local daemon
+
+```bash
+runlight onboarding
+```
+
+The onboarding flow opens the hosted dashboard, asks for the upload token you
+generated in Settings, starts the local daemon, and offers to install Codex and
+Claude hooks. To do the same steps manually:
+
+```bash
+runlight login --server https://runlight.renaissancemind.ai
+runlight daemon start
+runlight plugin codex
+runlight plugin claude
+```
+
+### 3. Verify local setup
+
+```bash
+runlight status
+runlight health
+```
+
+Start a fresh Codex or Claude Code session after installing hooks, then watch it
+appear in the dashboard.
+
+### Local development server
+
+To run the FastAPI server and React dashboard from source:
 
 ```bash
 cd server
@@ -104,70 +156,30 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 python -m uvicorn runlight.app:app --host 127.0.0.1 --port 8766
-```
 
-Verify the server:
-
-```bash
-curl http://127.0.0.1:8766/api/health
-```
-
-Expected response:
-
-```json
-{"status":"ok","service":"runlight"}
-```
-
-### 2. Start the dashboard
-
-In another terminal:
-
-```bash
-cd dashboard
+cd ../dashboard
 npm install
 npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
-Open `http://127.0.0.1:3000`. The dashboard defaults to
-`http://127.0.0.1:8766`; you can edit the server URL and token in Settings.
-
-### 3. Install an agent hook
-
-For Codex local development:
-
-```bash
-bash adapters/codex-hook/install.sh http://127.0.0.1:8766
-```
-
-For Claude Code local development:
-
-```bash
-bash adapters/claude-code-hook/install.sh http://127.0.0.1:8766
-```
-
-These installers write user-level hook configuration:
-
-- Codex: `$CODEX_HOME/hooks.json` or `~/.codex/hooks.json`
-- Claude Code: `~/.claude/settings.json` unless `CLAUDE_SETTINGS_FILE` is set
-
-Start a fresh agent session after installing hooks, then watch it appear in the
-dashboard.
+Point the daemon at the local server with `runlight setting` or
+`runlight login --server http://127.0.0.1:8766 --token <token>`.
 
 ## Agent Integrations
 
 ### Codex
 
-The repository includes both a local hook adapter and a packaged Codex plugin.
-The plugin installation makes the Runlight skill and scripts available; the
-hook installer is the step that starts event collection.
-
-Local adapter:
+Install Codex hooks through the npm CLI:
 
 ```bash
-bash adapters/codex-hook/install.sh http://127.0.0.1:8766
+runlight plugin codex
 ```
 
-Packaged plugin flow:
+The installer writes user-level hook configuration to `$CODEX_HOME/hooks.json`
+or `~/.codex/hooks.json`. The hook command is `runlight hook codex`, so Codex
+only talks to the local daemon.
+
+The packaged Codex plugin is still useful for skill/marketplace workflows:
 
 ```bash
 codex plugin marketplace add /path/to/Runlight
@@ -182,17 +194,21 @@ Codex state files are available.
 
 ### Claude Code
 
-Use the local adapter for repository development:
+Install Claude Code hooks through the npm CLI:
 
 ```bash
-bash adapters/claude-code-hook/install.sh http://127.0.0.1:8766
+runlight plugin claude
 ```
 
-Use the packaged plugin for Claude Code plugin workflows:
+The installer writes user-level hook configuration to `~/.claude/settings.json`
+unless `CLAUDE_SETTINGS_FILE` is set. The hook command is `runlight hook claude`,
+so Claude Code only talks to the local daemon.
+
+The packaged plugin remains available:
 
 ```bash
 cd plugins/runlight-claude
-bash install.sh --server http://127.0.0.1:8766
+bash install.sh
 ```
 
 The Claude Code integration records session lifecycle, tool activity,
@@ -210,15 +226,15 @@ pip install -e ".[dev]"
 Wrap a command:
 
 ```bash
-runlight run --agent generic -- python -m pytest
+runlight-adapter run --agent generic -- python -m pytest
 ```
 
 Send manual lifecycle events:
 
 ```bash
-runlight event --session demo-1 --type user_input.waiting --summary "Waiting for review"
-runlight heartbeat --session demo-1
-runlight finish --session demo-1 --result completed --summary "Done"
+runlight-adapter event --session demo-1 --type user_input.waiting --summary "Waiting for review"
+runlight-adapter heartbeat --session demo-1
+runlight-adapter finish --session demo-1 --result completed --summary "Done"
 ```
 
 Configure the adapter with environment variables:
@@ -303,6 +319,7 @@ All clients and viewers use the same REST API:
 |---|---|---|
 | `POST` | `/api/events` | Ingest one event or `{ "events": [...] }` batch |
 | `GET` | `/api/health` | Health check |
+| `GET` | `/api/ingest/health` | Bearer-token ingest credential check |
 | `GET` | `/api/users/current` | Resolve current user from bearer token |
 | `GET` | `/api/sessions/live` | List active, pinned, or still-visible sessions |
 | `GET` | `/api/sessions` | List sessions with optional filters |
@@ -338,6 +355,24 @@ Standard event types include `session.started`, `session.heartbeat`,
 
 Server environment variables use the `RUNLIGHT_` prefix.
 
+Local CLI configuration lives in `~/.runlight/config.json` unless
+`RUNLIGHT_HOME` is set. The local daemon listens on `127.0.0.1:18766` by
+default, stores queued hook events under `~/.runlight/queue`, and uploads them
+with the dashboard-generated upload token saved by `runlight login`.
+
+Useful local commands:
+
+```bash
+runlight onboarding
+runlight login
+runlight setting
+runlight status
+runlight health
+runlight daemon start
+runlight plugin codex
+runlight plugin claude
+```
+
 | Variable | Default | Description |
 |---|---|---|
 | `RUNLIGHT_SERVER_HOST` | `127.0.0.1` | Host used by server settings |
@@ -361,6 +396,12 @@ configured, unknown bearer tokens are rejected.
 ## Development
 
 Run checks for the component you changed.
+
+### Local npm CLI and daemon
+
+```bash
+npm test
+```
 
 ### Server
 
@@ -420,10 +461,11 @@ swift run RunlightBar
 ## Known Boundaries
 
 - Hook installers modify user-level Codex or Claude Code configuration.
-- Codex plugin installation alone does not activate monitoring; run the bundled
-  hook installer after plugin install or update.
-- The local development hooks are fail-open and best-effort so monitoring does
-  not block agent work.
+- Codex plugin installation alone does not activate monitoring; run
+  `runlight plugin codex` or the bundled hook installer after plugin install or
+  update.
+- Codex and Claude hooks are fail-open and only call the local daemon. The
+  daemon owns token storage, queueing, retry, and upload.
 - Do not expose the self-hosted server without TLS and an explicit token map.
 - No license file is currently present in this repository.
 

@@ -1,10 +1,10 @@
 """CLI wrapper for Runlight.
 
 Usage:
-    runlight run --agent codex -- <command>
-    runlight event --session <id> --type <event_type>
-    runlight heartbeat --session <id>
-    runlight finish --session <id> --result completed
+    runlight-adapter run --agent codex -- <command>
+    runlight-adapter event --session <id> --type <event_type>
+    runlight-adapter heartbeat --session <id>
+    runlight-adapter finish --session <id> --result completed
 """
 
 from __future__ import annotations
@@ -100,8 +100,8 @@ def cmd_finish(args: argparse.Namespace) -> int:
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="runlight",
-        description="Runlight CLI — record agent lifecycle events",
+        prog="runlight-adapter",
+        description="Runlight adapter CLI — record generic command lifecycle events",
     )
     sub = parser.add_subparsers(dest="subcommand", required=True)
 
