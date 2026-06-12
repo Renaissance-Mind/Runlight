@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   distributeMessageDeviceGroups,
+  formatCompactRelativeTime,
   groupSessionsByDeviceAndProject,
   groupMessageItemsByDevice,
   groupSessionsByDevice,
@@ -348,6 +349,16 @@ describe("pet-ready session view models", () => {
         { totalItems: 4, deviceNames: ["linux-box", "mac-mini"] },
       ],
     );
+  });
+
+  it("formats compact message relative time without an ago suffix", () => {
+    const now = new Date("2026-06-12T12:00:00.000Z").getTime();
+
+    assert.equal(formatCompactRelativeTime("2026-06-12T11:59:47.000Z", now), "13s");
+    assert.equal(formatCompactRelativeTime("2026-06-12T11:57:00.000Z", now), "3m");
+    assert.equal(formatCompactRelativeTime("2026-06-12T09:00:00.000Z", now), "3h");
+    assert.equal(formatCompactRelativeTime("2026-06-09T12:00:00.000Z", now), "3d");
+    assert.equal(formatCompactRelativeTime(null, now), "-");
   });
 
   it("keeps saved project order and appends new projects", () => {

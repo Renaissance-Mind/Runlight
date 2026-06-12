@@ -156,6 +156,21 @@ function sortTimeValue(value: string | null | undefined): number {
   return new Date(value.endsWith("Z") ? value : `${value}Z`).getTime();
 }
 
+export function formatCompactRelativeTime(
+  isoStr: string | null,
+  nowMs = Date.now(),
+): string {
+  if (!isoStr) return "-";
+  const ms = nowMs - sortTimeValue(isoStr);
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  return `${Math.floor(hr / 24)}d`;
+}
+
 export function groupMessageItemsByDevice<T extends MessageDeviceInput>(
   items: T[],
 ): MessageDeviceGroup<T>[] {

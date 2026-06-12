@@ -7,30 +7,10 @@ import { useLiveSessions, useRecentEvents } from "../hooks/useSessions";
 import { getStatusPresentation } from "../api/statusPresentation";
 import {
   distributeMessageDeviceGroups,
+  formatCompactRelativeTime,
   groupMessageItemsByDevice,
 } from "../api/viewModels";
 import AgentIcon from "./AgentIcon";
-
-function parseUTC(isoStr: string): number {
-  return new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
-}
-
-function timeAgo(isoStr: string | null): string {
-  if (!isoStr) return "-";
-  const sec = Math.floor((Date.now() - parseUTC(isoStr)) / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
-}
-
-function clockTime(isoStr: string | null): string {
-  if (!isoStr) return "";
-  const d = new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z");
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 // Map a completion event type to the status string understood by the
 // shared status presentation so colors stay consistent with the table.
@@ -89,14 +69,21 @@ function MessageRow({ item }: { item: MessageItem }) {
 function LiveRow({ session: s }: { session: Session }) {
   const presentation = getStatusPresentation(s.current_status, s.last_event_at);
   const title = s.session_name || s.summary || "Running";
+  const timeRef = s.current_run_started_at || s.started_at;
 
   return (
     <Link
       to={`/sessions/${s.session_id}`}
       className="flex items-center gap-3 border-b border-surface-3/50 px-3 py-2 hover:bg-surface-2/50 transition-colors"
     >
-      <span className="relative flex shrink-0">
+      <span className="relative flex shrink-0 items-center gap-1.5">
         <span className={`h-2 w-2 rounded-full ${presentation.dotClass}`} />
+        <span
+          className={`min-w-7 text-xs font-semibold tabular-nums ${presentation.textClass}`}
+          title={timeRef ?? undefined}
+        >
+          {formatCompactRelativeTime(timeRef)}
+        </span>
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -112,12 +99,6 @@ function LiveRow({ session: s }: { session: Session }) {
           </span>
         </div>
       </div>
-      <span
-        className="shrink-0 whitespace-nowrap text-[10px] text-gray-500"
-        title={(s.current_run_started_at || s.started_at) ?? undefined}
-      >
-        {clockTime(s.current_run_started_at || s.started_at)} · {timeAgo(s.current_run_started_at || s.started_at)}
-      </span>
     </Link>
   );
 }
@@ -133,8 +114,14 @@ function EventRow({ event }: { event: SessionEvent }) {
       to={`/sessions/${event.session_id}`}
       className="flex items-center gap-3 border-b border-surface-3/50 px-3 py-2 hover:bg-surface-2/50 transition-colors"
     >
-      <span className="relative flex shrink-0">
+      <span className="relative flex shrink-0 items-center gap-1.5">
         <span className={`h-2 w-2 rounded-full ${presentation.dotClass}`} />
+        <span
+          className={`min-w-7 text-xs font-semibold tabular-nums ${presentation.textClass}`}
+          title={event.event_time ?? undefined}
+        >
+          {formatCompactRelativeTime(event.event_time)}
+        </span>
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -147,12 +134,6 @@ function EventRow({ event }: { event: SessionEvent }) {
           <span className="truncate text-sm text-white">{title}</span>
         </div>
       </div>
-      <span
-        className="shrink-0 whitespace-nowrap text-[10px] text-gray-500"
-        title={event.event_time ?? undefined}
-      >
-        {clockTime(event.event_time)} · {timeAgo(event.event_time)}
-      </span>
     </Link>
   );
 }
