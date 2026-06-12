@@ -25,29 +25,32 @@ export async function promptText(message, { defaultValue = "" } = {}) {
   return value.trim() || defaultValue;
 }
 
-export async function promptSecret(message) {
-  if (!process.stdin.isTTY) return promptText(message);
+export async function promptSecret(message, { stdin = process.stdin, stdout = process.stdout } = {}) {
+  if (!stdin.isTTY) return promptText(message);
   return new Promise((resolve, reject) => {
     let value = "";
-    const stdin = process.stdin;
     const wasRaw = stdin.isRaw;
+    const wasPaused = typeof stdin.isPaused === "function" ? stdin.isPaused() : false;
     readline.emitKeypressEvents(stdin);
     stdin.setRawMode(true);
     stdin.resume();
-    process.stdout.write(`${message}: `);
+    stdout.write(`${message}: `);
 
-    function done(result) {
+    function restoreInput() {
       stdin.off("keypress", onKeypress);
       stdin.setRawMode(Boolean(wasRaw));
-      process.stdout.write("\n");
+      if (wasPaused && typeof stdin.pause === "function") stdin.pause();
+      stdout.write("\n");
+    }
+
+    function done(result) {
+      restoreInput();
       resolve(result);
     }
 
     function onKeypress(str, key) {
       if (key?.ctrl && key.name === "c") {
-        stdin.off("keypress", onKeypress);
-        stdin.setRawMode(Boolean(wasRaw));
-        process.stdout.write("\n");
+        restoreInput();
         reject(new Error("Cancelled"));
         return;
       }
@@ -58,13 +61,13 @@ export async function promptSecret(message) {
       if (key?.name === "backspace" || key?.name === "delete") {
         if (value.length > 0) {
           value = value.slice(0, -1);
-          process.stdout.write("\b \b");
+          stdout.write("\b \b");
         }
         return;
       }
       if (str && !key?.meta && !key?.ctrl) {
         value += str;
-        process.stdout.write("*");
+        stdout.write("*");
       }
     }
 
