@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import { installLaunchAgent, queryDaemon, runDaemon, startDaemon, stopDaemon } from "./daemon.js";
 import { clearUploadToken, loadConfig, loadOrCreateConfig, normalizeServerUrl, redactConfig, updateConfig } from "./config.js";
@@ -59,6 +60,77 @@ function printJson(value) {
   console.log(JSON.stringify(value, null, 2));
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function makeCliConnectCode() {
+  return `rl_cli_${crypto.randomBytes(24).toString("base64url")}`;
+}
+
+export function buildCliConnectUrl(serverUrl, code) {
+  const url = new URL(`${normalizeServerUrl(serverUrl)}/connect`);
+  url.searchParams.set("cli_code", code);
+  return url.toString();
+}
+
+async function fetchConnectToken(serverUrl, code) {
+  const url = `${normalizeServerUrl(serverUrl)}/api/connect/cli/${encodeURIComponent(code)}`;
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+  });
+  const text = await response.text();
+  let data = {};
+  if (text.trim()) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      const preview = text.trim().slice(0, 80).replace(/\s+/g, " ");
+      throw new Error(`Connect endpoint returned non-JSON response at ${url}: ${preview}`);
+    }
+  }
+
+  if (response.status === 202 || data.status === "pending") return null;
+  if (!response.ok) {
+    const detail = typeof data === "object" && data !== null && typeof data.detail === "string"
+      ? data.detail
+      : response.statusText;
+    throw new Error(`Connect endpoint ${response.status}: ${detail}`);
+  }
+  if (data.status !== "complete" || typeof data.token !== "string" || !data.token.trim()) {
+    throw new Error("Connect endpoint returned an invalid completion payload");
+  }
+  return data.token.trim();
+}
+
+export async function waitForCliConnectToken(serverUrl, code, {
+  timeoutMs = 180000,
+  intervalMs = 1000,
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const token = await fetchConnectToken(serverUrl, code);
+    if (token) return token;
+    await sleep(intervalMs);
+  }
+  return null;
+}
+
+async function browserLoginToken(serverUrl, opts = {}) {
+  const code = makeCliConnectCode();
+  const url = buildCliConnectUrl(serverUrl, code);
+  note("Browser setup", [
+    "The browser page will sign you in and connect this terminal automatically.",
+    opts.noOpen ? `Open this URL: ${url}` : "Opening the Runlight connect page now.",
+  ]);
+  if (!opts.noOpen) openUrl(url);
+  note("Waiting for browser", [
+    "Finish sign-in in the browser.",
+    "This terminal will continue automatically when the page says OK.",
+  ]);
+  return waitForCliConnectToken(serverUrl, code);
+}
+
 async function healthPayload(response, expectedService) {
   const text = await response.text();
   let data = null;
@@ -101,14 +173,16 @@ async function runLogin(opts) {
   const serverUrl = normalizeServerUrl(opts.server || current.server_url || DEFAULT_SERVER_URL);
   let token = String(opts.token || "").trim();
   intro("Runlight Login");
-  note("Dashboard", [
-    `Server: ${serverUrl}`,
-    "Sign in from the browser page and copy the upload token it shows.",
-  ]);
+  note("Dashboard", [`Server: ${serverUrl}`]);
   if (!token && await confirm("Open Runlight connect page in your browser?", { defaultValue: true })) {
-    openUrl(`${serverUrl}/connect`);
+    token = await browserLoginToken(serverUrl, opts);
   }
-  if (!token) token = await promptSecret("Upload token from browser");
+  if (!token) {
+    note("Manual fallback", [
+      `Open ${serverUrl}/connect, create an upload token, and paste it here.`,
+    ]);
+    token = await promptSecret("Upload token from browser");
+  }
   if (!token) throw new Error("Upload token is required");
   const config = await updateConfig({ server_url: serverUrl, upload_token: token });
   outro(`Saved Runlight credentials in ${resolvePaths().config}`);
@@ -335,12 +409,13 @@ async function runSetup(opts = {}) {
   let token = String(opts.token || current.upload_token || "").trim();
   note("Dashboard", [`Server: ${serverUrl}`]);
   if (!token) {
-    note("Browser setup", [
-      "The page will sign you in and create an upload token automatically.",
-      "Copy the token shown there and paste it here.",
+    token = await browserLoginToken(serverUrl, opts);
+  }
+  if (!token) {
+    note("Manual fallback", [
+      `Open ${serverUrl}/connect, create an upload token, and paste it here.`,
     ]);
-    if (!opts.noOpen) openUrl(`${serverUrl}/connect`);
-    token = await promptSecret("Paste upload token from browser");
+    token = await promptSecret("Upload token from browser");
   }
   if (!token) throw new Error("Upload token is required");
   await updateConfig({ server_url: serverUrl, upload_token: token });

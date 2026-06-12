@@ -41,11 +41,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from runlight.routers import health, ingest, sessions, users
+    from runlight.routers import health, ingest, sessions, user_settings, users
 
     app.include_router(health.router)
     app.include_router(ingest.router)
     app.include_router(sessions.router)
+    app.include_router(user_settings.router)
     app.include_router(users.router)
 
     return app

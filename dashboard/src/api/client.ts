@@ -73,6 +73,15 @@ export interface CreatedUploadToken extends UploadTokenRecord {
   token: string;
 }
 
+export type UserTheme = "dark" | "light" | "system";
+export type UserLanguage = "system" | "en" | "zh-CN";
+
+export interface UserSettings {
+  theme: UserTheme;
+  language: UserLanguage;
+  updated_at: string | null;
+}
+
 export async function fetchLiveSessions(
   config: DashboardConnectionConfig = defaultConfig,
 ): Promise<Session[]> {
@@ -175,6 +184,34 @@ export async function deleteUploadToken(
   config: DashboardConnectionConfig = defaultConfig,
 ): Promise<void> {
   await fetchJSON<{ deleted: number }>(config, `/tokens/${tokenId}`, { method: "DELETE" });
+}
+
+export async function fetchUserSettings(
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<UserSettings> {
+  const data = await fetchJSON<{ settings: UserSettings }>(config, "/user-settings");
+  return data.settings;
+}
+
+export async function saveUserSettings(
+  settings: Pick<UserSettings, "theme" | "language">,
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<UserSettings> {
+  const data = await fetchJSON<{ settings: UserSettings }>(config, "/user-settings", {
+    method: "PATCH",
+    body: JSON.stringify(settings),
+  });
+  return data.settings;
+}
+
+export async function completeCliConnect(
+  code: string,
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<void> {
+  await fetchJSON<{ ok: true }>(config, "/connect/cli", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
 }
 
 export async function probeServerConnection(

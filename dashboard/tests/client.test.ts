@@ -6,9 +6,12 @@ import {
   createUploadToken,
   deleteSession,
   deleteUploadToken,
+  completeCliConnect,
   fetchCurrentUser,
   fetchUploadTokens,
+  fetchUserSettings,
   probeServerConnection,
+  saveUserSettings,
 } from "../src/api/client.ts";
 
 let serverUrl = "";
@@ -67,6 +70,25 @@ const server = createServer((req, res) => {
 
   if (req.url === "/api/tokens/42" && req.method === "DELETE") {
     res.end(JSON.stringify({ deleted: 42 }));
+    return;
+  }
+
+  if (req.url === "/api/user-settings" && req.method === "GET") {
+    res.end(JSON.stringify({
+      settings: { theme: "light", language: "zh-CN", updated_at: "2026-06-12T06:30:00.000Z" },
+    }));
+    return;
+  }
+
+  if (req.url === "/api/user-settings" && req.method === "PATCH") {
+    res.end(JSON.stringify({
+      settings: { theme: "dark", language: "en", updated_at: "2026-06-12T06:31:00.000Z" },
+    }));
+    return;
+  }
+
+  if (req.url === "/api/connect/cli" && req.method === "POST") {
+    res.end(JSON.stringify({ ok: true }));
     return;
   }
 
@@ -142,6 +164,24 @@ describe("dashboard runtime API client", () => {
       created_at: "2026-06-11T08:01:00.000Z",
     });
     await deleteUploadToken(42, config);
+
+    assert.equal(lastAuthorization, "Bearer tok-user-1");
+  });
+
+  it("loads and saves user settings through the configured server", async () => {
+    const config = { serverUrl, token: "tok-user-1" };
+
+    assert.deepEqual(await fetchUserSettings(config), {
+      theme: "light",
+      language: "zh-CN",
+      updated_at: "2026-06-12T06:30:00.000Z",
+    });
+    assert.deepEqual(await saveUserSettings({ theme: "dark", language: "en" }, config), {
+      theme: "dark",
+      language: "en",
+      updated_at: "2026-06-12T06:31:00.000Z",
+    });
+    await completeCliConnect("rl_cli_abcdefghijklmnopqrstuvwxyz123456", config);
 
     assert.equal(lastAuthorization, "Bearer tok-user-1");
   });

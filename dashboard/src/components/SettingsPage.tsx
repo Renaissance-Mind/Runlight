@@ -13,7 +13,7 @@ import {
   formatConnectionStatus,
   normalizeSettingsDraft,
 } from "../api/settingsModel";
-import { getEffectiveTheme, type DashboardPreferences, type Theme } from "../api/preferences";
+import { getEffectiveTheme, type DashboardPreferences, type Language, type Theme } from "../api/preferences";
 
 function statusToneClass(tone: "ok" | "muted" | "error"): string {
   switch (tone) {
@@ -271,6 +271,25 @@ export default function SettingsPage({
               <option value="dark">Dark</option>
               <option value="light">Light</option>
               <option value="system">System</option>
+            </select>
+          </label>
+
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase text-gray-500 tracking-wider">
+              Language
+            </span>
+            <select
+              value={prefsDraft.language}
+              onChange={(e) => {
+                const next = e.currentTarget.value as Language;
+                setSaved(false);
+                setPrefsDraft({ ...prefsDraft, language: next });
+              }}
+              className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm"
+            >
+              <option value="system">System</option>
+              <option value="en">English</option>
+              <option value="zh-CN">中文</option>
             </select>
           </label>
 

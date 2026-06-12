@@ -1,7 +1,9 @@
 export type Theme = "dark" | "light" | "system";
+export type Language = "system" | "en" | "zh-CN";
 
 export interface DashboardPreferences {
   theme: Theme;
+  language: Language;
   hideStaleAfterHours: number;
   hideFinishedAfterHours: number;
 }
@@ -10,6 +12,7 @@ const STORAGE_KEY = "runlight.dashboard.preferences";
 
 const DEFAULTS: DashboardPreferences = {
   theme: "dark",
+  language: "system",
   hideStaleAfterHours: 5,
   hideFinishedAfterHours: 5,
 };

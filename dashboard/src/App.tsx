@@ -16,7 +16,7 @@ import {
   type DashboardConnectionConfig,
 } from "./api/config";
 import type { ServerConnectionProbe } from "./api/client";
-import { logout } from "./api/client";
+import { fetchUserSettings, logout, saveUserSettings } from "./api/client";
 import { formatConnectionStatus } from "./api/settingsModel";
 import {
   readPreferences,
@@ -160,12 +160,43 @@ export default function App() {
   const savePrefs = (next: DashboardPreferences) => {
     writePreferences(next);
     setPrefs(next);
+    saveUserSettings({ theme: next.theme, language: next.language }, config).catch(() => {
+      // Local preferences are already saved; the server can be retried later.
+    });
   };
 
   useEffect(() => {
     const theme = getEffectiveTheme(prefs.theme);
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [prefs.theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = prefs.language === "system"
+      ? window.navigator.language || "en"
+      : prefs.language;
+  }, [prefs.language]);
+
+  useEffect(() => {
+    if (!probe?.ok) return;
+    let cancelled = false;
+    fetchUserSettings(config)
+      .then((settings) => {
+        if (cancelled) return;
+        const next = {
+          ...readPreferences(),
+          theme: settings.theme,
+          language: settings.language,
+        };
+        writePreferences(next);
+        setPrefs(next);
+      })
+      .catch(() => {
+        // Keep local fallback settings when server-side preferences are unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [config.serverUrl, config.token, probe?.ok]);
 
   const authRequired = probe?.error?.startsWith("API 401") && !config.token.trim();
   const loggedInWithCookie = probe?.ok && !config.token.trim() && probe.userId && probe.userId !== "default";

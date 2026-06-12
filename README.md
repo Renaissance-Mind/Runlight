@@ -128,9 +128,9 @@ runlight setup
 ```
 
 The setup flow opens a browser connect page, signs you in, creates an upload
-token automatically, asks you to paste that token back into the terminal, starts
-the local daemon, installs Codex and Claude hooks, and keeps future events
-flowing through the daemon.
+token automatically, returns it to the CLI through a short-lived browser
+handoff, starts the local daemon, installs Codex and Claude hooks, and keeps
+future events flowing through the daemon.
 
 Codex will ask you to review the new hooks the next time you start a Codex
 session. Choose **Trust all and continue** once; after that Runlight runs in the
@@ -145,9 +145,9 @@ runlight status
 Start a fresh Codex or Claude Code session after installing hooks, then watch it
 appear in the dashboard.
 
-For advanced/manual setup, open `/connect` on your Runlight server, copy the
-token shown there, then use `runlight login`, `runlight daemon start`, and
-`runlight plugin <codex|claude>`.
+For advanced/manual setup, open `/connect` on your Runlight server without a
+CLI handoff code, copy the token shown there, then use `runlight login`,
+`runlight daemon start`, and `runlight plugin <codex|claude>`.
 
 To disconnect this machine from Runlight:
 
@@ -315,9 +315,10 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET
 npm run deploy
 ```
 
-The hosted dashboard uses GitHub or Google OAuth sessions. After signing in,
-open `/connect` to generate and display an upload token for agent hooks. Set
-`PUBLIC_BASE_URL` to the dashboard origin, for example
+The hosted dashboard uses GitHub or Google OAuth sessions. `runlight setup`
+opens `/connect?cli_code=...`, signs the user in, and returns a short-lived
+upload token to the CLI automatically. Set `PUBLIC_BASE_URL` to the dashboard
+origin, for example
 `https://runlight.renaissancemind.ai`. OAuth callbacks are
 `/auth/callback/github` and `/auth/callback/google`. `RUNLIGHT_TOKEN_MAP`
 remains available for static small-team deployments, but generated dashboard
@@ -343,6 +344,10 @@ All clients and viewers use the same REST API:
 | `GET` | `/api/tokens` | List upload token previews for the signed-in user |
 | `POST` | `/api/tokens` | Generate an upload token for agent hooks |
 | `DELETE` | `/api/tokens/:id` | Delete one upload token |
+| `GET` | `/api/user-settings` | Read the signed-in user's theme and language defaults |
+| `PATCH` | `/api/user-settings` | Save the signed-in user's theme and language defaults |
+| `POST` | `/api/connect/cli` | Browser side of automatic CLI setup handoff |
+| `GET` | `/api/connect/cli/:code` | CLI side of automatic setup token handoff |
 
 Single-event ingest example:
 

@@ -165,8 +165,8 @@ For the Cloudflare Worker deployment, viewers sign in with GitHub or Google
 OAuth and the local daemon uploads agent events with bearer tokens generated
 from the dashboard.
 After deploying, run the setup flow on each monitored machine. It opens
-`/connect`, signs you in, creates an upload token automatically, and asks you to
-paste that token back into the terminal:
+`/connect?cli_code=...`, signs you in, creates an upload token automatically,
+and returns it to the CLI through a short-lived browser handoff:
 
 ```bash
 runlight setup --server https://runlight.example.com

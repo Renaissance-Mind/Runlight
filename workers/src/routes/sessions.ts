@@ -5,6 +5,13 @@ import { inferStatus } from "../status";
 
 export const sessions = new Hono<{ Bindings: Env }>();
 
+const COMPLETION_EVENT_TYPES = [
+  "message.finished",
+  "session.completed",
+  "session.failed",
+  "session.aborted",
+];
+
 function staleSeconds(env: Env): number {
   return parseInt(env.HEARTBEAT_STALE_SECONDS || "120", 10);
 }
@@ -32,6 +39,25 @@ function sessionToJson(row: SessionRow) {
     last_heartbeat_at: row.last_heartbeat_at,
     event_count: row.event_count,
     terminal_result: row.terminal_result,
+  };
+}
+
+function eventRowToJson(row: Record<string, unknown>) {
+  return {
+    event_id: row.event_id,
+    session_id: row.session_id,
+    session_name: row.session_name,
+    session_pin: Boolean(row.session_pin),
+    agent_type: row.agent_type,
+    event_type: row.event_type,
+    event_time: row.event_time,
+    received_time: row.received_time,
+    severity: row.severity,
+    summary: row.summary,
+    machine_hostname: row.machine_hostname,
+    workspace_cwd: row.workspace_cwd,
+    workspace_project_name: row.workspace_project_name,
+    payload: row.payload_json ? JSON.parse(row.payload_json as string) : null,
   };
 }
 
@@ -64,6 +90,39 @@ async function refreshStatuses(db: D1Database, userId: string, staleSec: number)
     }
   }
 }
+
+sessions.get("/events/recent", async (c) => {
+  let userId: string;
+  try {
+    userId = await resolveRequestUser(c.env, c.req.raw);
+  } catch {
+    return c.json({ detail: "Authentication required" }, 401);
+  }
+
+  await refreshStatuses(c.env.DB, userId, staleSeconds(c.env));
+
+  const limit = Math.min(Math.max(parseInt(c.req.query("limit") || "100", 10), 1), 500);
+  const completionsOnly = c.req.query("completions_only") !== "false";
+  let sql = `
+    SELECT e.event_id, e.session_id, e.session_name, e.session_pin, e.agent_type, e.event_type,
+           e.event_time, e.received_time, e.severity, e.summary, e.machine_hostname,
+           e.workspace_cwd, e.payload_json, s.workspace_project_name
+    FROM events e
+    LEFT JOIN sessions s ON e.session_id = s.session_id
+    WHERE e.user_id = ?`;
+  const params: unknown[] = [userId];
+
+  if (completionsOnly) {
+    sql += ` AND e.event_type IN (${COMPLETION_EVENT_TYPES.map(() => "?").join(", ")})`;
+    params.push(...COMPLETION_EVENT_TYPES);
+  }
+
+  sql += " ORDER BY e.event_time DESC LIMIT ?";
+  params.push(limit);
+
+  const result = await c.env.DB.prepare(sql).bind(...params).all();
+  return c.json({ events: (result.results || []).map((row) => eventRowToJson(row as Record<string, unknown>)) });
+});
 
 sessions.get("/sessions/live", async (c) => {
   let userId: string;
@@ -190,29 +249,15 @@ sessions.get("/sessions/:sessionId/events", async (c) => {
   if (!session) return c.json({ detail: "Session not found" }, 404);
 
   const result = await c.env.DB.prepare(
-    `SELECT event_id, session_id, session_name, session_pin, event_type, event_time, received_time,
-            severity, summary, machine_hostname, workspace_cwd, payload_json
+    `SELECT event_id, session_id, session_name, session_pin, agent_type, event_type, event_time,
+            received_time, severity, summary, machine_hostname, workspace_cwd, payload_json
      FROM events WHERE session_id = ? ORDER BY event_time ASC LIMIT ?`,
   )
     .bind(sessionId, limit)
     .all();
 
   const events = (result.results || []).map((row) => {
-    const r = row as Record<string, unknown>;
-    return {
-      event_id: r.event_id,
-      session_id: r.session_id,
-      session_name: r.session_name,
-      session_pin: Boolean(r.session_pin),
-      event_type: r.event_type,
-      event_time: r.event_time,
-      received_time: r.received_time,
-      severity: r.severity,
-      summary: r.summary,
-      machine_hostname: r.machine_hostname,
-      workspace_cwd: r.workspace_cwd,
-      payload: r.payload_json ? JSON.parse(r.payload_json as string) : null,
-    };
+    return eventRowToJson(row as Record<string, unknown>);
   });
 
   return c.json({ events });

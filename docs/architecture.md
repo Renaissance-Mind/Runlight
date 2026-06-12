@@ -132,7 +132,7 @@ For multi-user remote access with self-service registration.
 ```
 
 - `server_url`: Pre-configured in the cloud-hosted plugin preset. Users don't need to set it.
-- `token`: Obtained through the browser `/connect` flow, or pasted directly for manual setup.
+- `token`: Obtained through the browser `/connect?cli_code=...` setup handoff, or pasted directly for manual setup.
 
 ---
 

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { DashboardConnectionConfig } from "../api/config";
-import { createUploadToken, type CreatedUploadToken } from "../api/client";
+import {
+  completeCliConnect,
+  createUploadToken,
+  type CreatedUploadToken,
+} from "../api/client";
 
 type CopyTarget = "token" | "command" | null;
 
@@ -10,20 +14,31 @@ export default function ConnectPage({
 }: {
   config: DashboardConnectionConfig;
 }) {
+  const [searchParams] = useSearchParams();
+  const cliCode = searchParams.get("cli_code")?.trim() ?? "";
+  const isCliConnect = cliCode.length > 0;
   const [token, setToken] = useState<CreatedUploadToken | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<CopyTarget>(null);
   const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     setCopied(null);
-    createUploadToken(config)
-      .then((created) => {
-        if (!cancelled) setToken(created);
+    setConnected(false);
+    setToken(null);
+    const task = isCliConnect
+      ? completeCliConnect(cliCode, config).then(() => {
+        if (!cancelled) setConnected(true);
       })
+      : createUploadToken(config).then((created) => {
+        if (!cancelled) setToken(created);
+      });
+
+    task
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       })
@@ -33,7 +48,7 @@ export default function ConnectPage({
     return () => {
       cancelled = true;
     };
-  }, [config.serverUrl, config.token]);
+  }, [cliCode, config.serverUrl, config.token, isCliConnect]);
 
   const setupCommand = useMemo(() => {
     if (!token) return "";
@@ -54,7 +69,9 @@ export default function ConnectPage({
               Connect Runlight CLI
             </h1>
             <p className="mt-1 text-xs text-gray-500">
-              Copy this token back into your terminal to finish setup.
+              {isCliConnect
+                ? "Keep this page open until your terminal finishes setup."
+                : "Copy this token back into your terminal to finish setup."}
             </p>
           </div>
           <Link
@@ -67,7 +84,7 @@ export default function ConnectPage({
 
         {loading ? (
           <div className="border border-surface-3 bg-surface-2 rounded px-3 py-3 text-xs text-gray-500">
-            Creating upload token...
+            {isCliConnect ? "Connecting CLI..." : "Creating upload token..."}
           </div>
         ) : null}
 
@@ -80,6 +97,14 @@ export default function ConnectPage({
             >
               Retry
             </button>
+          </div>
+        ) : null}
+
+        {connected ? (
+          <div className="border border-accent-green/40 bg-accent-green/5 rounded p-3">
+            <p className="text-xs text-accent-green">
+              Runlight CLI connected. Return to your terminal.
+            </p>
           </div>
         ) : null}
 

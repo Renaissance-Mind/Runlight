@@ -30,6 +30,17 @@ class Token(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    user_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    theme: Mapped[str] = mapped_column(String(20), default="dark", nullable=False)
+    language: Mapped[str] = mapped_column(String(20), default="system", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Session(Base):
     __tablename__ = "sessions"
 

@@ -147,6 +147,27 @@ class TestSessionQueries:
         assert len(events) == 2
         assert events[0]["event_type"] == "session.started"
 
+    async def test_recent_events_feed(self, client):
+        await client.post("/api/events", json=_make_event(
+            session_id="sess-msg",
+            event_type="session.started",
+            workspace={"project_name": "Runlight"},
+        ))
+        await client.post("/api/events", json=_make_event(
+            session_id="sess-msg",
+            event_type="message.finished",
+            summary="Done",
+        ))
+
+        resp = await client.get("/api/events/recent", params={"limit": 10})
+
+        assert resp.status_code == 200
+        events = resp.json()["events"]
+        assert len(events) == 1
+        assert events[0]["event_type"] == "message.finished"
+        assert events[0]["agent_type"] == "codex"
+        assert events[0]["workspace_project_name"] == "Runlight"
+
     async def test_cross_user_isolation(self, client):
         await client.post(
             "/api/events",
