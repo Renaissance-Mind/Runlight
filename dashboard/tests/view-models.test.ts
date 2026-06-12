@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   groupSessionsByDeviceAndProject,
+  groupMessageItemsByDevice,
   groupSessionsByDevice,
   groupSessionsByProject,
   mergeProjectOrder,
@@ -214,6 +215,61 @@ describe("pet-ready session view models", () => {
           projects: [
             { projectName: "Runlight", sessionIds: ["s3"] },
           ],
+        },
+      ],
+    );
+  });
+
+  it("groups message items only by device and sorts each device group", () => {
+    const groups = groupMessageItemsByDevice([
+      {
+        key: "mac-old-runlight",
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        workspace_project_name: "Runlight",
+        sortTime: "2026-06-12T09:00:00.000Z",
+      },
+      {
+        key: "linux-new",
+        machine_id: "mid-2",
+        machine_hostname: "linux-box",
+        machine_os: "linux",
+        machine_user: "ubuntu",
+        workspace_project_name: "Runlight",
+        sortTime: "2026-06-12T12:00:00.000Z",
+      },
+      {
+        key: "mac-new-paper",
+        machine_id: null,
+        machine_hostname: "studio-mac",
+        machine_os: null,
+        machine_user: null,
+        workspace_project_name: "PaperBanana",
+        sortTime: "2026-06-12T11:00:00.000Z",
+      },
+    ]);
+
+    assert.deepEqual(
+      groups.map((group) => ({
+        deviceKey: group.deviceKey,
+        deviceName: group.deviceName,
+        itemKeys: group.items.map((item) => item.key),
+        hasProjectGroups: "projectGroups" in group,
+      })),
+      [
+        {
+          deviceKey: "id:mid-2",
+          deviceName: "linux-box",
+          itemKeys: ["linux-new"],
+          hasProjectGroups: false,
+        },
+        {
+          deviceKey: "id:mid-1",
+          deviceName: "studio-mac",
+          itemKeys: ["mac-new-paper", "mac-old-runlight"],
+          hasProjectGroups: false,
         },
       ],
     );

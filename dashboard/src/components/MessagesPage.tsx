@@ -4,6 +4,7 @@ import type { Session, SessionEvent } from "../types/session";
 import type { DashboardConnectionConfig } from "../api/config";
 import { useLiveSessions, useRecentEvents } from "../hooks/useSessions";
 import { getStatusPresentation } from "../api/statusPresentation";
+import { groupMessageItemsByDevice } from "../api/viewModels";
 import AgentIcon from "./AgentIcon";
 
 function parseUTC(isoStr: string): number {
@@ -62,6 +63,10 @@ interface MessageItem {
   key: string;
   sessionId: string;
   sortTime: string | null;
+  machine_hostname: string | null;
+  machine_os: string | null;
+  machine_user: string | null;
+  machine_id: string | null;
   kind: "event" | "live";
   event?: SessionEvent;
   session?: Session;
@@ -185,6 +190,10 @@ export default function MessagesPage({
         key: `live-${s.session_id}`,
         sessionId: s.session_id,
         sortTime: s.current_run_started_at || s.started_at,
+        machine_hostname: s.machine_hostname,
+        machine_os: s.machine_os,
+        machine_user: s.machine_user,
+        machine_id: s.machine_id,
         kind: "live" as const,
         session: s,
       }));
@@ -201,16 +210,21 @@ export default function MessagesPage({
         key: e.event_id,
         sessionId: e.session_id,
         sortTime: e.event_time,
+        machine_hostname: e.machine_hostname,
+        machine_os: null,
+        machine_user: null,
+        machine_id: null,
         kind: "event" as const,
         event: e,
       }));
 
-    return [...liveItems, ...eventItems].sort((a, b) => {
-      const ta = a.sortTime ? parseUTC(a.sortTime) : 0;
-      const tb = b.sortTime ? parseUTC(b.sortTime) : 0;
-      return tb - ta;
-    });
+    return [...liveItems, ...eventItems];
   }, [rawEvents, liveSessions]);
+
+  const messageGroups = useMemo(
+    () => groupMessageItemsByDevice(items),
+    [items],
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -242,8 +256,25 @@ export default function MessagesPage({
           </div>
         ) : (
           <div>
-            {items.map((item) => (
-              <MessageRow key={item.key} item={item} />
+            {messageGroups.map((group) => (
+              <section key={group.deviceKey}>
+                <div className="flex items-center gap-2 border-b border-surface-3/70 bg-surface-2/60 px-4 py-2">
+                  <span className="truncate text-xs font-semibold text-gray-400">
+                    {group.deviceName}
+                  </span>
+                  {group.deviceMeta && (
+                    <span className="hidden shrink-0 text-[10px] text-gray-600 sm:inline">
+                      {group.deviceMeta}
+                    </span>
+                  )}
+                  <span className="shrink-0 text-[10px] text-gray-600">
+                    {group.items.length} message(s)
+                  </span>
+                </div>
+                {group.items.map((item) => (
+                  <MessageRow key={item.key} item={item} />
+                ))}
+              </section>
             ))}
           </div>
         )}

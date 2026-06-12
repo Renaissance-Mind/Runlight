@@ -36,6 +36,18 @@ export interface DeviceProjectSessionGroup<
   projectGroups: ProjectSessionGroup<T>[];
 }
 
+export interface MessageDeviceInput extends DeviceSessionInput {
+  key: string;
+  sortTime: string | null;
+}
+
+export interface MessageDeviceGroup<T extends MessageDeviceInput> {
+  deviceKey: string;
+  deviceName: string;
+  deviceMeta: string | null;
+  items: T[];
+}
+
 export interface SessionSurfaceCounts {
   running: number;
   finished: number;
@@ -132,6 +144,58 @@ export function groupSessionsByDeviceAndProject<
     ...deviceGroup,
     projectGroups: groupSessionsByProject(deviceGroup.sessions),
   }));
+}
+
+function sortTimeValue(value: string | null | undefined): number {
+  if (!value) return 0;
+  return new Date(value.endsWith("Z") ? value : `${value}Z`).getTime();
+}
+
+export function groupMessageItemsByDevice<T extends MessageDeviceInput>(
+  items: T[],
+): MessageDeviceGroup<T>[] {
+  const canonicalByHostname = new Map<string, T>();
+  for (const item of items) {
+    const hostname = cleanLabel(item.machine_hostname);
+    if (hostname && cleanLabel(item.machine_id) && !canonicalByHostname.has(hostname)) {
+      canonicalByHostname.set(hostname, item);
+    }
+  }
+
+  const groups = new Map<string, MessageDeviceGroup<T>>();
+  for (const item of items) {
+    const hostname = cleanLabel(item.machine_hostname);
+    const identitySource =
+      cleanLabel(item.machine_id) || !hostname
+        ? item
+        : canonicalByHostname.get(hostname) || item;
+    const deviceKey = getSessionDeviceKey(identitySource);
+    const group = groups.get(deviceKey);
+
+    if (group) {
+      group.items.push(item);
+    } else {
+      groups.set(deviceKey, {
+        deviceKey,
+        deviceName: getSessionDeviceName(identitySource),
+        deviceMeta: getSessionDeviceMeta(identitySource),
+        items: [item],
+      });
+    }
+  }
+
+  const orderedGroups = Array.from(groups.values());
+  for (const group of orderedGroups) {
+    group.items.sort(
+      (a, b) => sortTimeValue(b.sortTime) - sortTimeValue(a.sortTime),
+    );
+  }
+
+  return orderedGroups.sort((a, b) => {
+    const aLatest = sortTimeValue(a.items[0]?.sortTime);
+    const bLatest = sortTimeValue(b.items[0]?.sortTime);
+    return bLatest - aLatest;
+  });
 }
 
 export function groupSessionsByProject<T extends ProjectSessionInput>(
