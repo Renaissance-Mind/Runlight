@@ -2,9 +2,13 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import type { Session, SessionEvent } from "../types/session";
 import type { DashboardConnectionConfig } from "../api/config";
+import type { DashboardPreferences } from "../api/preferences";
 import { useLiveSessions, useRecentEvents } from "../hooks/useSessions";
 import { getStatusPresentation } from "../api/statusPresentation";
-import { groupMessageItemsByDevice } from "../api/viewModels";
+import {
+  distributeMessageDeviceGroups,
+  groupMessageItemsByDevice,
+} from "../api/viewModels";
 import AgentIcon from "./AgentIcon";
 
 function parseUTC(isoStr: string): number {
@@ -89,7 +93,7 @@ function LiveRow({ session: s }: { session: Session }) {
   return (
     <Link
       to={`/sessions/${s.session_id}`}
-      className="flex items-center gap-3 border-b border-surface-3/50 px-4 py-3 hover:bg-surface-2/50 transition-colors"
+      className="flex items-center gap-3 border-b border-surface-3/50 px-3 py-2 hover:bg-surface-2/50 transition-colors"
     >
       <span className="relative flex shrink-0">
         <span className={`h-2 w-2 rounded-full ${presentation.dotClass}`} />
@@ -106,12 +110,6 @@ function LiveRow({ session: s }: { session: Session }) {
           <span className={`shrink-0 text-[10px] ${presentation.textClass}`}>
             {s.current_status}
           </span>
-        </div>
-        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-gray-500">
-          {s.machine_hostname && <span>{s.machine_hostname}</span>}
-          {s.workspace_cwd && (
-            <span className="truncate">· {s.workspace_cwd}</span>
-          )}
         </div>
       </div>
       <span
@@ -133,7 +131,7 @@ function EventRow({ event }: { event: SessionEvent }) {
   return (
     <Link
       to={`/sessions/${event.session_id}`}
-      className="flex items-center gap-3 border-b border-surface-3/50 px-4 py-3 hover:bg-surface-2/50 transition-colors"
+      className="flex items-center gap-3 border-b border-surface-3/50 px-3 py-2 hover:bg-surface-2/50 transition-colors"
     >
       <span className="relative flex shrink-0">
         <span className={`h-2 w-2 rounded-full ${presentation.dotClass}`} />
@@ -148,12 +146,6 @@ function EventRow({ event }: { event: SessionEvent }) {
           <span className="shrink-0 flex items-center"><AgentIcon agentType={event.agent_type} /></span>
           <span className="truncate text-sm text-white">{title}</span>
         </div>
-        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-gray-500">
-          {event.machine_hostname && <span>{event.machine_hostname}</span>}
-          {event.workspace_cwd && (
-            <span className="truncate">· {event.workspace_cwd}</span>
-          )}
-        </div>
       </div>
       <span
         className="shrink-0 whitespace-nowrap text-[10px] text-gray-500"
@@ -167,8 +159,10 @@ function EventRow({ event }: { event: SessionEvent }) {
 
 export default function MessagesPage({
   config,
+  prefs,
 }: {
   config: DashboardConnectionConfig;
+  prefs: DashboardPreferences;
 }) {
   const { events: rawEvents, loading: eventsLoading, error: eventsError, refresh: refreshEvents } = useRecentEvents(config, 3000, 200);
   const { sessions: liveSessions, loading: liveLoading, error: liveError, refresh: refreshLive } = useLiveSessions(config, 3000);
@@ -225,6 +219,10 @@ export default function MessagesPage({
     () => groupMessageItemsByDevice(items),
     [items],
   );
+  const messageColumns = useMemo(
+    () => distributeMessageDeviceGroups(messageGroups, prefs.messageMaxColumns),
+    [messageGroups, prefs.messageMaxColumns],
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -255,27 +253,41 @@ export default function MessagesPage({
             No sessions yet. Start an agent to see it here.
           </div>
         ) : (
-          <div>
-            {messageGroups.map((group) => (
-              <section key={group.deviceKey}>
-                <div className="flex items-center gap-2 border-b border-surface-3/70 bg-surface-2/60 px-4 py-2">
-                  <span className="truncate text-xs font-semibold text-gray-400">
-                    {group.deviceName}
-                  </span>
-                  {group.deviceMeta && (
-                    <span className="hidden shrink-0 text-[10px] text-gray-600 sm:inline">
-                      {group.deviceMeta}
-                    </span>
-                  )}
-                  <span className="shrink-0 text-[10px] text-gray-600">
-                    {group.items.length} message(s)
-                  </span>
+          <div className="overflow-x-auto px-4 py-4">
+            <div
+              className="grid gap-3"
+              style={{
+                gridTemplateColumns: `repeat(${messageColumns.length}, minmax(18rem, 1fr))`,
+              }}
+            >
+              {messageColumns.map((column, columnIndex) => (
+                <div key={columnIndex} className="min-w-0 space-y-3">
+                  {column.groups.map((group) => (
+                    <section
+                      key={group.deviceKey}
+                      className="min-w-0 overflow-hidden rounded border border-surface-3 bg-surface-1"
+                    >
+                      <div className="flex items-center gap-2 border-b border-surface-3/70 bg-surface-2/60 px-3 py-2">
+                        <span className="truncate text-xs font-semibold text-gray-400">
+                          {group.deviceName}
+                        </span>
+                        {group.deviceMeta && (
+                          <span className="hidden shrink-0 text-[10px] text-gray-600 lg:inline">
+                            {group.deviceMeta}
+                          </span>
+                        )}
+                        <span className="shrink-0 text-[10px] text-gray-600">
+                          {group.items.length}
+                        </span>
+                      </div>
+                      {group.items.map((item) => (
+                        <MessageRow key={item.key} item={item} />
+                      ))}
+                    </section>
+                  ))}
                 </div>
-                {group.items.map((item) => (
-                  <MessageRow key={item.key} item={item} />
-                ))}
-              </section>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </main>

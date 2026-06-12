@@ -48,6 +48,11 @@ export interface MessageDeviceGroup<T extends MessageDeviceInput> {
   items: T[];
 }
 
+export interface MessageDeviceColumn<T extends MessageDeviceInput> {
+  groups: MessageDeviceGroup<T>[];
+  totalItems: number;
+}
+
 export interface SessionSurfaceCounts {
   running: number;
   finished: number;
@@ -196,6 +201,33 @@ export function groupMessageItemsByDevice<T extends MessageDeviceInput>(
     const bLatest = sortTimeValue(b.items[0]?.sortTime);
     return bLatest - aLatest;
   });
+}
+
+export function distributeMessageDeviceGroups<T extends MessageDeviceInput>(
+  groups: MessageDeviceGroup<T>[],
+  maxColumns: number,
+): MessageDeviceColumn<T>[] {
+  const columnCount = Math.min(
+    groups.length || 1,
+    Math.max(1, Math.floor(maxColumns)),
+  );
+  const columns: MessageDeviceColumn<T>[] = Array.from(
+    { length: columnCount },
+    () => ({ groups: [], totalItems: 0 }),
+  );
+
+  for (const group of groups) {
+    let target = columns[0];
+    for (const column of columns.slice(1)) {
+      if (column.totalItems < target.totalItems) {
+        target = column;
+      }
+    }
+    target.groups.push(group);
+    target.totalItems += group.items.length;
+  }
+
+  return columns;
 }
 
 export function groupSessionsByProject<T extends ProjectSessionInput>(

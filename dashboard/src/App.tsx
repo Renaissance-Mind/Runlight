@@ -251,7 +251,7 @@ export default function App() {
       </header>
       <Routes>
         <Route path="/" element={<Dashboard config={config} prefs={prefs} />} />
-        <Route path="/messages" element={<MessagesPage config={config} />} />
+        <Route path="/messages" element={<MessagesPage config={config} prefs={prefs} />} />
         <Route path="/connect" element={<ConnectPage config={config} />} />
         <Route
           path="/sessions/:sessionId"

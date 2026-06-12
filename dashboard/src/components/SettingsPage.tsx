@@ -327,6 +327,30 @@ export default function SettingsPage({
             />
           </label>
 
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase text-gray-500 tracking-wider">
+              Messages max columns
+            </span>
+            <input
+              type="number"
+              min="1"
+              max="6"
+              step="1"
+              value={prefsDraft.messageMaxColumns}
+              onChange={(e) => {
+                setSaved(false);
+                setPrefsDraft({
+                  ...prefsDraft,
+                  messageMaxColumns: Math.min(
+                    6,
+                    Math.max(1, Math.floor(Number(e.currentTarget.value))),
+                  ),
+                });
+              }}
+              className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm text-gray-200"
+            />
+          </label>
+
           <p className="text-[10px] text-gray-600">
             Set to 0 to never hide. Pinned sessions are always shown.
           </p>

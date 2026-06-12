@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  distributeMessageDeviceGroups,
   groupSessionsByDeviceAndProject,
   groupMessageItemsByDevice,
   groupSessionsByDevice,
@@ -271,6 +272,80 @@ describe("pet-ready session view models", () => {
           itemKeys: ["mac-new-paper", "mac-old-runlight"],
           hasProjectGroups: false,
         },
+      ],
+    );
+  });
+
+  it("distributes message device groups into the shortest available columns", () => {
+    const groups = groupMessageItemsByDevice([
+      {
+        key: "mac-1",
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        sortTime: "2026-06-12T12:00:00.000Z",
+      },
+      {
+        key: "mac-2",
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        sortTime: "2026-06-12T11:59:00.000Z",
+      },
+      {
+        key: "linux-1",
+        machine_id: "mid-2",
+        machine_hostname: "linux-box",
+        machine_os: "linux",
+        machine_user: "ubuntu",
+        sortTime: "2026-06-12T11:00:00.000Z",
+      },
+      {
+        key: "mini-1",
+        machine_id: "mid-3",
+        machine_hostname: "mac-mini",
+        machine_os: "darwin",
+        machine_user: "runner",
+        sortTime: "2026-06-12T10:00:00.000Z",
+      },
+      {
+        key: "mini-2",
+        machine_id: "mid-3",
+        machine_hostname: "mac-mini",
+        machine_os: "darwin",
+        machine_user: "runner",
+        sortTime: "2026-06-12T09:59:00.000Z",
+      },
+      {
+        key: "mini-3",
+        machine_id: "mid-3",
+        machine_hostname: "mac-mini",
+        machine_os: "darwin",
+        machine_user: "runner",
+        sortTime: "2026-06-12T09:58:00.000Z",
+      },
+      {
+        key: "remote-1",
+        machine_id: "mid-4",
+        machine_hostname: "remote",
+        machine_os: "linux",
+        machine_user: "runner",
+        sortTime: "2026-06-12T09:00:00.000Z",
+      },
+    ]);
+
+    const columns = distributeMessageDeviceGroups(groups, 2);
+
+    assert.deepEqual(
+      columns.map((column) => ({
+        totalItems: column.totalItems,
+        deviceNames: column.groups.map((group) => group.deviceName),
+      })),
+      [
+        { totalItems: 3, deviceNames: ["studio-mac", "remote"] },
+        { totalItems: 4, deviceNames: ["linux-box", "mac-mini"] },
       ],
     );
   });
