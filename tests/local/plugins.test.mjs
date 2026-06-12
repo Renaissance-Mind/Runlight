@@ -29,6 +29,23 @@ describe("local plugin installers", () => {
     assert.equal(after.hooks.SessionStart, undefined);
   });
 
+  it("installs Codex hooks with a PATH-independent default command", async () => {
+    const home = await tempDir("runlight-codex-home-");
+    const env = { ...process.env, CODEX_HOME: home };
+
+    const result = await installCodexPlugin({ env });
+    const hooks = JSON.parse(await fs.readFile(result.hooksFile, "utf8"));
+    const command = hooks.hooks.SessionStart[0].hooks[0].command;
+
+    assert.match(command, /node'?/);
+    assert.match(command, /bin\/runlight\.js'?\s+hook\s+codex/);
+    assert.equal(command.includes("runlight hook codex"), false);
+    assert.equal(result.command, command);
+
+    const status = await pluginStatus({ env });
+    assert.equal(status.codex.installed, true);
+  });
+
   it("installs Claude hooks as async daemon CLI commands", async () => {
     const dir = await tempDir("runlight-claude-home-");
     const settingsFile = path.join(dir, "settings.json");

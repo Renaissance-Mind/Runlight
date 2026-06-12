@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const CODEX_EVENTS = [
   ["SessionStart", 5],
@@ -24,8 +25,17 @@ const CLAUDE_EVENTS = [
   "Stop",
 ];
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+function defaultCommand(agent) {
+  const cliPath = fileURLToPath(new URL("../../bin/runlight.js", import.meta.url));
+  return `${shellQuote(process.execPath)} ${shellQuote(cliPath)} hook ${agent}`;
+}
+
 function commandFor(agent, override) {
-  return override || `runlight hook ${agent}`;
+  return override || defaultCommand(agent);
 }
 
 async function readJsonFile(file, fallback) {
@@ -45,7 +55,7 @@ async function writeJsonFile(file, value) {
 function isRunlightHookCommand(command, agent) {
   const text = String(command || "");
   return new RegExp(`runlight\\s+hook\\s+${agent}`).test(text)
-    || new RegExp(`runlight\\.js"?(\\s+)hook\\s+${agent}`).test(text)
+    || new RegExp(`runlight\\.js['"]?\\s+hook\\s+${agent}`).test(text)
     || /runlight-hook\.sh/.test(text)
     || /agent-monitor-hook\.sh/.test(text);
 }
