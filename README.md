@@ -147,6 +147,15 @@ appear in the dashboard.
 For advanced/manual setup, use `runlight login`, `runlight daemon start`, and
 `runlight plugin <codex|claude>`.
 
+To disconnect this machine from Runlight:
+
+```bash
+runlight logout
+```
+
+Logout removes the local upload token, uninstalls Codex and Claude hooks, and
+stops the local daemon. Run `runlight setup` again to reconnect.
+
 ### Local development server
 
 To run the FastAPI server and React dashboard from source:
@@ -367,6 +376,7 @@ Useful local commands:
 ```bash
 runlight setup
 runlight login
+runlight logout
 runlight setting
 runlight status
 runlight health

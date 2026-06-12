@@ -123,6 +123,10 @@ export async function updateConfig(patch, env = process.env) {
   }, env);
 }
 
+export async function clearUploadToken(env = process.env) {
+  return updateConfig({ upload_token: "" }, env);
+}
+
 export function redactConfig(config) {
   return {
     server_url: config.server_url,

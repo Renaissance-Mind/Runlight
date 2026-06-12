@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { installLaunchAgent, queryDaemon, runDaemon, startDaemon, stopDaemon } from "./daemon.js";
-import { loadConfig, loadOrCreateConfig, normalizeServerUrl, redactConfig, updateConfig } from "./config.js";
+import { clearUploadToken, loadConfig, loadOrCreateConfig, normalizeServerUrl, redactConfig, updateConfig } from "./config.js";
 import { DEFAULT_SERVER_URL, localDaemonUrl, resolvePaths } from "./paths.js";
 import { installClaudePlugin, installCodexPlugin, pluginStatus, uninstallClaudePlugin, uninstallCodexPlugin } from "./plugins.js";
 import { postHookInput, readStdin } from "./hook.js";
@@ -12,6 +12,7 @@ function printHelp() {
 Usage:
   runlight setup [--token <token>] [--server <url>]
   runlight login [--server <url>] [--token <token>]
+  runlight logout [--json] [--keep-hooks] [--keep-daemon]
   runlight status [--json]
   runlight health [--json]
   runlight setting
@@ -112,6 +113,33 @@ async function runLogin(opts) {
   const config = await updateConfig({ server_url: serverUrl, upload_token: token });
   outro(`Saved Runlight credentials in ${resolvePaths().config}`);
   return config;
+}
+
+async function stopDaemonIfRunning() {
+  try {
+    return await stopDaemon();
+  } catch (error) {
+    return { stopped: false, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function runLogout(opts) {
+  if (!opts.json) intro("Runlight Logout");
+  const hooks = opts.keepHooks ? { skipped: true } : await uninstallPlugin("all");
+  const daemon = opts.keepDaemon ? { skipped: true } : await stopDaemonIfRunning();
+  const config = await clearUploadToken();
+  const payload = { config: redactConfig(config), daemon, hooks };
+  if (opts.json) {
+    printJson(payload);
+    return payload;
+  }
+  note("Signed out", [
+    "Upload token removed from local config.",
+    opts.keepHooks ? "Local hooks left installed." : "Codex and Claude hooks removed.",
+    opts.keepDaemon ? "Daemon left running." : daemon.stopped ? "Daemon stopped." : "Daemon was not running.",
+  ]);
+  outro("Run `runlight setup` to connect this machine again.");
+  return payload;
 }
 
 async function runHealth(opts) {
@@ -334,6 +362,7 @@ export async function main(argv) {
   }
   if (command === "setup" || command === "install" || command === "onboarding" || command === "onboard") return runSetup(opts);
   if (command === "login") return runLogin(opts);
+  if (command === "logout") return runLogout(opts);
   if (command === "status") return runStatus(opts);
   if (command === "health") return runHealth(opts);
   if (command === "setting" || command === "settings") return runSetting(positional);
