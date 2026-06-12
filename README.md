@@ -37,7 +37,7 @@ custom clients.
 ## Features
 
 - Daemon-first local ingestion for Codex and Claude Code
-- npm-installed `runlight` CLI with onboarding, login, status, health, settings, and plugin installation commands
+- npm-installed `runlight` CLI with one-command setup, login, status, health, settings, and plugin installation commands
 - Local durable queue for hook events before upload
 - Shared event protocol for all agent adapters
 - Live session status inference from real events and heartbeats
@@ -121,32 +121,31 @@ From a source checkout, use:
 npm install -g .
 ```
 
-### 2. Login and start the local daemon
+### 2. Set up this machine
 
 ```bash
-runlight onboarding
+runlight setup
 ```
 
-The onboarding flow opens the hosted dashboard, asks for the upload token you
-generated in Settings, starts the local daemon, and offers to install Codex and
-Claude hooks. To do the same steps manually:
+The setup flow opens the hosted dashboard, asks for your upload token, starts
+the local daemon, installs Codex and Claude hooks, and keeps future events
+flowing through the daemon.
 
-```bash
-runlight login --server https://runlight.renaissancemind.ai
-runlight daemon start
-runlight plugin codex
-runlight plugin claude
-```
+Codex will ask you to review the new hooks the next time you start a Codex
+session. Choose **Trust all and continue** once; after that Runlight runs in the
+background.
 
 ### 3. Verify local setup
 
 ```bash
 runlight status
-runlight health
 ```
 
 Start a fresh Codex or Claude Code session after installing hooks, then watch it
 appear in the dashboard.
+
+For advanced/manual setup, use `runlight login`, `runlight daemon start`, and
+`runlight plugin <codex|claude>`.
 
 ### Local development server
 
@@ -178,8 +177,9 @@ runlight plugin codex
 ```
 
 The installer writes user-level hook configuration to `$CODEX_HOME/hooks.json`
-or `~/.codex/hooks.json`. The hook command is `runlight hook codex`, so Codex
-only talks to the local daemon.
+or `~/.codex/hooks.json` and enables Codex's local hook feature in
+`$CODEX_HOME/config.toml` or `~/.codex/config.toml`. The hook command is
+`runlight hook codex`, so Codex only talks to the local daemon.
 
 The packaged Codex plugin is still useful for skill/marketplace workflows:
 
@@ -365,7 +365,7 @@ with the dashboard-generated upload token saved by `runlight login`.
 Useful local commands:
 
 ```bash
-runlight onboarding
+runlight setup
 runlight login
 runlight setting
 runlight status

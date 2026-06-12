@@ -10,7 +10,7 @@ function printHelp() {
   console.log(`Runlight local CLI
 
 Usage:
-  runlight onboarding
+  runlight setup [--token <token>] [--server <url>]
   runlight login [--server <url>] [--token <token>]
   runlight status [--json]
   runlight health [--json]
@@ -24,6 +24,10 @@ Environment:
   RUNLIGHT_SERVER_URL    Default server URL
   RUNLIGHT_TOKEN         Default upload token
   RUNLIGHT_DAEMON_PORT   Default local daemon port
+
+Aliases:
+  runlight onboarding
+  runlight install
 `);
 }
 
@@ -191,6 +195,13 @@ async function uninstallPlugin(target) {
   throw new Error("Plugin target must be codex, claude, or all");
 }
 
+function setupTargetFromOptions(opts) {
+  if (opts.noPlugins) return "skip";
+  if (opts.codexOnly) return "codex";
+  if (opts.claudeOnly) return "claude";
+  return String(opts.plugins || "all");
+}
+
 async function runPlugin(positional, opts) {
   const target = positional[1] || "all";
   const result = opts.uninstall ? await uninstallPlugin(target) : await installPlugin(target, opts);
@@ -276,29 +287,35 @@ async function runSetting(positional) {
   }
 }
 
-async function runOnboarding() {
-  intro("Runlight Onboarding");
+function printCodexTrustNotice() {
+  note("Codex one-time approval", [
+    "Open a new Codex session after setup.",
+    "When Codex says hooks need review, choose Trust all and continue.",
+    "This is Codex's own safety confirmation; Runlight does not bypass it.",
+  ]);
+}
+
+async function runSetup(opts = {}) {
+  intro("Runlight Setup");
   note("What this does", [
-    "Stores your Runlight server URL and upload token locally.",
+    "Connects this machine to your Runlight dashboard.",
     "Starts the local daemon.",
-    "Installs Codex/Claude hooks that only talk to the daemon.",
+    "Installs local Codex and Claude hooks.",
   ]);
   const current = await loadOrCreateConfig();
-  const serverUrl = await promptText("Server URL", { defaultValue: current.server_url || DEFAULT_SERVER_URL });
-  const openSettings = await confirm("Open Dashboard settings to create an upload token?", { defaultValue: true });
-  if (openSettings) openUrl(`${normalizeServerUrl(serverUrl)}/settings`);
-  const token = await promptSecret("Upload token");
+  const serverUrl = normalizeServerUrl(opts.server || current.server_url || DEFAULT_SERVER_URL);
+  note("Dashboard", [`Server: ${serverUrl}`]);
+  if (!opts.noOpen) openUrl(`${serverUrl}/settings`);
+  let token = String(opts.token || current.upload_token || "").trim();
+  if (!token) token = await promptSecret("Paste upload token");
   if (!token) throw new Error("Upload token is required");
   await updateConfig({ server_url: serverUrl, upload_token: token });
-  await startDaemon();
-  const target = await select("Install local hooks", [
-    { value: "all", label: "Codex + Claude", hint: "Recommended" },
-    { value: "codex", label: "Codex only" },
-    { value: "claude", label: "Claude only" },
-    { value: "skip", label: "Skip" },
-  ]);
+  const daemon = await startDaemon();
+  const target = setupTargetFromOptions(opts);
   if (target !== "skip") await installPlugin(target, {});
-  outro("Runlight is ready. Run `runlight status` to verify.");
+  if (target === "all" || target === "codex") printCodexTrustNotice();
+  outro("Runlight is ready. Run `runlight status` any time to check it.");
+  return { serverUrl, daemon, plugins: target };
 }
 
 async function runHook(positional) {
@@ -315,7 +332,7 @@ export async function main(argv) {
     printHelp();
     return;
   }
-  if (command === "onboarding" || command === "onboard") return runOnboarding();
+  if (command === "setup" || command === "install" || command === "onboarding" || command === "onboard") return runSetup(opts);
   if (command === "login") return runLogin(opts);
   if (command === "status") return runStatus(opts);
   if (command === "health") return runHealth(opts);

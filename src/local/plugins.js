@@ -38,6 +38,10 @@ function commandFor(agent, override) {
   return override || defaultCommand(agent);
 }
 
+function codexHome(env) {
+  return env.CODEX_HOME || path.join(os.homedir(), ".codex");
+}
+
 async function readJsonFile(file, fallback) {
   try {
     return JSON.parse(await fs.readFile(file, "utf8"));
@@ -50,6 +54,53 @@ async function readJsonFile(file, fallback) {
 async function writeJsonFile(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function readTextFile(file, fallback = "") {
+  try {
+    return await fs.readFile(file, "utf8");
+  } catch (error) {
+    if (error && error.code === "ENOENT") return fallback;
+    throw error;
+  }
+}
+
+export function enableCodexHooksFeatureToml(input) {
+  const lines = String(input || "").split(/\r?\n/);
+  const featuresStart = lines.findIndex((line) => /^\s*\[features]\s*$/.test(line));
+  if (featuresStart === -1) {
+    const prefix = input && !String(input).endsWith("\n") ? "\n\n" : input ? "\n" : "";
+    return `${String(input || "")}${prefix}[features]\nhooks = true\n`;
+  }
+
+  let sectionEnd = lines.length;
+  for (let i = featuresStart + 1; i < lines.length; i += 1) {
+    if (/^\s*\[[^\]]+]\s*$/.test(lines[i])) {
+      sectionEnd = i;
+      break;
+    }
+  }
+
+  for (let i = featuresStart + 1; i < sectionEnd; i += 1) {
+    if (/^\s*hooks\s*=/.test(lines[i])) {
+      lines[i] = "hooks = true";
+      return `${lines.join("\n").replace(/\n*$/, "")}\n`;
+    }
+  }
+
+  lines.splice(featuresStart + 1, 0, "hooks = true");
+  return `${lines.join("\n").replace(/\n*$/, "")}\n`;
+}
+
+async function enableCodexHooksFeature({ env = process.env } = {}) {
+  const configFile = path.join(codexHome(env), "config.toml");
+  const before = await readTextFile(configFile);
+  const after = enableCodexHooksFeatureToml(before);
+  if (after !== before) {
+    await fs.mkdir(path.dirname(configFile), { recursive: true });
+    await fs.writeFile(configFile, after);
+  }
+  return { configFile, enabled: true, changed: after !== before };
 }
 
 function isRunlightHookCommand(command, agent) {
@@ -70,8 +121,8 @@ function pruneHookEntries(entries, agent) {
 }
 
 export async function installCodexPlugin({ env = process.env, command } = {}) {
-  const codexHome = env.CODEX_HOME || path.join(os.homedir(), ".codex");
-  const hooksFile = path.join(codexHome, "hooks.json");
+  const home = codexHome(env);
+  const hooksFile = path.join(home, "hooks.json");
   const config = await readJsonFile(hooksFile, { hooks: {} });
   config.hooks ||= {};
   for (const [event, timeout] of CODEX_EVENTS) {
@@ -81,12 +132,12 @@ export async function installCodexPlugin({ env = process.env, command } = {}) {
     });
   }
   await writeJsonFile(hooksFile, config);
-  return { hooksFile, events: CODEX_EVENTS.map(([event]) => event), command: commandFor("codex", command) };
+  const feature = await enableCodexHooksFeature({ env });
+  return { hooksFile, configFile: feature.configFile, hooksFeature: feature, events: CODEX_EVENTS.map(([event]) => event), command: commandFor("codex", command) };
 }
 
 export async function uninstallCodexPlugin({ env = process.env } = {}) {
-  const codexHome = env.CODEX_HOME || path.join(os.homedir(), ".codex");
-  const hooksFile = path.join(codexHome, "hooks.json");
+  const hooksFile = path.join(codexHome(env), "hooks.json");
   const config = await readJsonFile(hooksFile, { hooks: {} });
   config.hooks ||= {};
   for (const event of Object.keys(config.hooks)) {
@@ -124,8 +175,7 @@ export async function uninstallClaudePlugin({ env = process.env } = {}) {
 }
 
 export async function pluginStatus({ env = process.env } = {}) {
-  const codexHome = env.CODEX_HOME || path.join(os.homedir(), ".codex");
-  const hooksFile = path.join(codexHome, "hooks.json");
+  const hooksFile = path.join(codexHome(env), "hooks.json");
   const claudeSettingsFile = env.CLAUDE_SETTINGS_FILE || path.join(os.homedir(), ".claude", "settings.json");
   const codex = await readJsonFile(hooksFile, { hooks: {} });
   const claude = await readJsonFile(claudeSettingsFile, { hooks: {} });

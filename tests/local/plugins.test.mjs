@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { installClaudePlugin, installCodexPlugin, pluginStatus, uninstallClaudePlugin, uninstallCodexPlugin } from "../../src/local/plugins.js";
+import { enableCodexHooksFeatureToml, installClaudePlugin, installCodexPlugin, pluginStatus, uninstallClaudePlugin, uninstallCodexPlugin } from "../../src/local/plugins.js";
 
 async function tempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -41,9 +41,24 @@ describe("local plugin installers", () => {
     assert.match(command, /bin\/runlight\.js'?\s+hook\s+codex/);
     assert.equal(command.includes("runlight hook codex"), false);
     assert.equal(result.command, command);
+    assert.equal(result.hooksFeature.enabled, true);
+
+    const codexConfig = await fs.readFile(path.join(home, "config.toml"), "utf8");
+    assert.match(codexConfig, /\[features]\nhooks = true/);
 
     const status = await pluginStatus({ env });
     assert.equal(status.codex.installed, true);
+  });
+
+  it("enables Codex hooks in existing config.toml content", () => {
+    assert.equal(
+      enableCodexHooksFeatureToml('model = "gpt-5.5"\n\n[features]\nhooks = false\n\n[projects."/tmp"]\ntrust_level = "trusted"\n'),
+      'model = "gpt-5.5"\n\n[features]\nhooks = true\n\n[projects."/tmp"]\ntrust_level = "trusted"\n',
+    );
+    assert.equal(
+      enableCodexHooksFeatureToml('model = "gpt-5.5"\n'),
+      'model = "gpt-5.5"\n\n[features]\nhooks = true\n',
+    );
   });
 
   it("installs Claude hooks as async daemon CLI commands", async () => {
