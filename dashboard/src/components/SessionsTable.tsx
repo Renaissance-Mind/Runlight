@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Session } from "../types/session";
 import {
-  groupSessionsByDevice,
-  mergeProjectOrder as mergeDeviceOrder,
-  moveProjectInOrder as moveDeviceInOrder,
+  groupSessionsByDeviceAndProject,
+  mergeProjectOrder,
+  moveProjectInOrder,
 } from "../api/viewModels";
 import StatusBadge from "./StatusBadge";
 import AgentIcon from "./AgentIcon";
@@ -12,6 +12,9 @@ import AgentIcon from "./AgentIcon";
 const DEVICE_ORDER_STORAGE_KEY = "runlight.dashboard.device-order.v1";
 const COLLAPSED_DEVICES_STORAGE_KEY =
   "runlight.dashboard.collapsed-devices.v1";
+const PROJECT_ORDER_STORAGE_KEY = "runlight.dashboard.project-order.v1";
+const COLLAPSED_DEVICE_PROJECTS_STORAGE_KEY =
+  "runlight.dashboard.collapsed-device-projects.v1";
 
 function parseUTC(isoStr: string): number {
   return new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
@@ -82,6 +85,10 @@ function writeStoredStringList(key: string, values: string[]) {
   window.localStorage.setItem(key, JSON.stringify(values));
 }
 
+function deviceProjectKey(deviceKey: string, projectName: string): string {
+  return JSON.stringify([deviceKey, projectName]);
+}
+
 interface Props {
   sessions: Session[];
   loading: boolean;
@@ -90,11 +97,17 @@ interface Props {
 
 export default function SessionsTable({ sessions, loading, error }: Props) {
   const deviceGroups = useMemo(
-    () => groupSessionsByDevice(sessions),
+    () => groupSessionsByDeviceAndProject(sessions),
     [sessions],
   );
   const deviceKeys = useMemo(
     () => deviceGroups.map((group) => group.deviceKey),
+    [deviceGroups],
+  );
+  const projectNames = useMemo(
+    () => deviceGroups.flatMap((group) =>
+      group.projectGroups.map((projectGroup) => projectGroup.projectName),
+    ),
     [deviceGroups],
   );
   const [deviceOrder, setDeviceOrder] = useState(() =>
@@ -103,11 +116,17 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
   const [collapsedDevices, setCollapsedDevices] = useState(() =>
     readStoredStringList(COLLAPSED_DEVICES_STORAGE_KEY),
   );
+  const [projectOrder, setProjectOrder] = useState(() =>
+    readStoredStringList(PROJECT_ORDER_STORAGE_KEY),
+  );
+  const [collapsedProjects, setCollapsedProjects] = useState(() =>
+    readStoredStringList(COLLAPSED_DEVICE_PROJECTS_STORAGE_KEY),
+  );
 
   useEffect(() => {
     if (deviceKeys.length === 0) return;
     setDeviceOrder((previousOrder) => {
-      const nextOrder = mergeDeviceOrder(deviceKeys, previousOrder);
+      const nextOrder = mergeProjectOrder(deviceKeys, previousOrder);
       if (nextOrder.join("\u0000") === previousOrder.join("\u0000")) {
         return previousOrder;
       }
@@ -116,8 +135,20 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
     });
   }, [deviceKeys]);
 
+  useEffect(() => {
+    if (projectNames.length === 0) return;
+    setProjectOrder((previousOrder) => {
+      const nextOrder = mergeProjectOrder(projectNames, previousOrder);
+      if (nextOrder.join("\u0000") === previousOrder.join("\u0000")) {
+        return previousOrder;
+      }
+      writeStoredStringList(PROJECT_ORDER_STORAGE_KEY, nextOrder);
+      return nextOrder;
+    });
+  }, [projectNames]);
+
   const orderedDeviceKeys = useMemo(
-    () => mergeDeviceOrder(deviceKeys, deviceOrder),
+    () => mergeProjectOrder(deviceKeys, deviceOrder),
     [deviceKeys, deviceOrder],
   );
   const groupsByDevice = useMemo(
@@ -130,6 +161,10 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
   const collapsedDeviceSet = useMemo(
     () => new Set(collapsedDevices),
     [collapsedDevices],
+  );
+  const collapsedProjectSet = useMemo(
+    () => new Set(collapsedProjects),
+    [collapsedProjects],
   );
   const columnCount = 11;
 
@@ -149,12 +184,91 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
 
   const moveDevice = (deviceKey: string, direction: "up" | "down") => {
     setDeviceOrder((previousOrder) => {
-      const currentOrder = mergeDeviceOrder(deviceKeys, previousOrder);
-      const nextOrder = moveDeviceInOrder(currentOrder, deviceKey, direction);
+      const currentOrder = mergeProjectOrder(deviceKeys, previousOrder);
+      const nextOrder = moveProjectInOrder(currentOrder, deviceKey, direction);
       writeStoredStringList(DEVICE_ORDER_STORAGE_KEY, nextOrder);
       return nextOrder;
     });
   };
+
+  const toggleProject = (deviceKey: string, projectName: string) => {
+    const key = deviceProjectKey(deviceKey, projectName);
+    setCollapsedProjects((previousProjects) => {
+      const nextProjects = new Set(previousProjects);
+      if (nextProjects.has(key)) {
+        nextProjects.delete(key);
+      } else {
+        nextProjects.add(key);
+      }
+      const nextList = Array.from(nextProjects);
+      writeStoredStringList(COLLAPSED_DEVICE_PROJECTS_STORAGE_KEY, nextList);
+      return nextList;
+    });
+  };
+
+  const moveProject = (projectName: string, direction: "up" | "down") => {
+    setProjectOrder((previousOrder) => {
+      const currentOrder = mergeProjectOrder(projectNames, previousOrder);
+      const nextOrder = moveProjectInOrder(currentOrder, projectName, direction);
+      writeStoredStringList(PROJECT_ORDER_STORAGE_KEY, nextOrder);
+      return nextOrder;
+    });
+  };
+
+  const renderSessionRow = (s: Session) => (
+    <tr
+      key={s.session_id}
+      className="border-b border-surface-3/50 hover:bg-surface-2/50 transition-colors"
+    >
+      <td className="px-3 py-2 text-center">
+        <StatusBadge
+          status={s.current_status}
+          lastEventAt={s.last_event_at}
+          showLabel={false}
+        />
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-right text-gray-400">
+        {lastUpdate(s.last_event_at)}
+      </td>
+      <td className="px-3 py-2">
+        <span className={s.session_pin ? "text-accent-yellow" : "text-gray-600"}>
+          {s.session_pin ? "Pinned" : "-"}
+        </span>
+      </td>
+      <td className="px-3 py-2">
+        <AgentIcon agentType={s.agent_type} />
+      </td>
+      <td className="px-3 py-2 max-w-xs truncate">
+        <Link
+          to={`/sessions/${s.session_id}`}
+          className="hover:text-white transition-colors"
+        >
+          {s.session_name || s.summary || (
+            <span className="text-gray-500 italic">No summary</span>
+          )}
+          {s.summary_inferred && (
+            <span className="text-gray-600 ml-1">(inferred)</span>
+          )}
+        </Link>
+      </td>
+      <td className="px-3 py-2 text-gray-400">
+        {s.workspace_project_name || "-"}
+      </td>
+      <td className="px-3 py-2 text-gray-400">{shortPath(s.workspace_cwd)}</td>
+      <td className="px-3 py-2 text-accent-purple">
+        {s.workspace_git_branch || "-"}
+      </td>
+      <td className="px-3 py-2 text-gray-400">
+        {s.latest_event_type || "-"}
+      </td>
+      <td className="px-3 py-2 text-right text-gray-400">
+        {timeAgo(s.last_heartbeat_at)}
+      </td>
+      <td className="px-3 py-2 text-right text-gray-400">
+        {duration(s.started_at, s.last_event_at)}
+      </td>
+    </tr>
+  );
 
   if (error) {
     return (
@@ -198,6 +312,23 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
           const isCollapsed = collapsedDeviceSet.has(group.deviceKey);
           const isFirst = index === 0;
           const isLast = index === orderedDeviceGroups.length - 1;
+          const deviceProjectNames = group.projectGroups.map(
+            (projectGroup) => projectGroup.projectName,
+          );
+          const projectGroupsByName = new Map(
+            group.projectGroups.map((projectGroup) => [
+              projectGroup.projectName,
+              projectGroup,
+            ]),
+          );
+          const orderedProjectGroups = mergeProjectOrder(
+            deviceProjectNames,
+            projectOrder,
+          )
+            .map((projectName) => projectGroupsByName.get(projectName))
+            .filter((projectGroup): projectGroup is NonNullable<typeof projectGroup> =>
+              Boolean(projectGroup),
+            );
 
           return (
             <tbody key={group.deviceKey}>
@@ -226,6 +357,9 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                       <span className="shrink-0 text-[10px] text-gray-600">
                         {group.sessions.length} session(s)
                       </span>
+                      <span className="hidden shrink-0 text-[10px] text-gray-600 sm:inline">
+                        {group.projectGroups.length} project(s)
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -253,66 +387,76 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                 </td>
               </tr>
               {!isCollapsed &&
-                group.sessions.map((s) => (
-                  <tr
-                    key={s.session_id}
-                    className="border-b border-surface-3/50 hover:bg-surface-2/50 transition-colors"
-                  >
-                    <td className="px-3 py-2 text-center">
-                      <StatusBadge
-                        status={s.current_status}
-                        lastEventAt={s.last_event_at}
-                        showLabel={false}
-                      />
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-gray-400">
-                      {lastUpdate(s.last_event_at)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={
-                          s.session_pin ? "text-accent-yellow" : "text-gray-600"
-                        }
+                orderedProjectGroups.map((projectGroup, projectIndex) => {
+                  const projectKey = deviceProjectKey(
+                    group.deviceKey,
+                    projectGroup.projectName,
+                  );
+                  const projectCollapsed = collapsedProjectSet.has(projectKey);
+                  const projectIsFirst = projectIndex === 0;
+                  const projectIsLast =
+                    projectIndex === orderedProjectGroups.length - 1;
+
+                  return (
+                    <Fragment key={projectKey}>
+                      <tr
+                        key={projectKey}
+                        className="border-b border-surface-3/60 bg-surface-2/30"
                       >
-                        {s.session_pin ? "Pinned" : "-"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <AgentIcon agentType={s.agent_type} />
-                    </td>
-                    <td className="px-3 py-2 max-w-xs truncate">
-                      <Link
-                        to={`/sessions/${s.session_id}`}
-                        className="hover:text-white transition-colors"
-                      >
-                        {s.session_name || s.summary || (
-                          <span className="text-gray-500 italic">No summary</span>
-                        )}
-                        {s.summary_inferred && (
-                          <span className="text-gray-600 ml-1">(inferred)</span>
-                        )}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">
-                      {s.workspace_project_name || "-"}
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">
-                      {shortPath(s.workspace_cwd)}
-                    </td>
-                    <td className="px-3 py-2 text-accent-purple">
-                      {s.workspace_git_branch || "-"}
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">
-                      {s.latest_event_type || "-"}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-400">
-                      {timeAgo(s.last_heartbeat_at)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-400">
-                      {duration(s.started_at, s.last_event_at)}
-                    </td>
-                  </tr>
-                ))}
+                        <td colSpan={columnCount} className="px-3 py-1.5">
+                          <div className="flex items-center justify-between gap-3 pl-7">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleProject(group.deviceKey, projectGroup.projectName)
+                                }
+                                className="h-5 w-5 text-gray-500 hover:text-white"
+                                aria-label={`${projectCollapsed ? "Expand" : "Collapse"} ${projectGroup.projectName}`}
+                                aria-expanded={!projectCollapsed}
+                                title={projectCollapsed ? "Expand" : "Collapse"}
+                              >
+                                {projectCollapsed ? ">" : "v"}
+                              </button>
+                              <span className="truncate text-xs font-medium text-gray-500">
+                                {projectGroup.projectName}
+                              </span>
+                              <span className="shrink-0 text-[10px] text-gray-600">
+                                {projectGroup.sessions.length} session(s)
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveProject(projectGroup.projectName, "up")}
+                                disabled={projectIsFirst}
+                                aria-label={`Move ${projectGroup.projectName} up`}
+                                title="Move up"
+                                className="px-1.5 py-0.5 text-[10px] text-gray-500 hover:text-white disabled:cursor-not-allowed disabled:text-gray-700"
+                              >
+                                ^
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  moveProject(projectGroup.projectName, "down")
+                                }
+                                disabled={projectIsLast}
+                                aria-label={`Move ${projectGroup.projectName} down`}
+                                title="Move down"
+                                className="px-1.5 py-0.5 text-[10px] text-gray-500 hover:text-white disabled:cursor-not-allowed disabled:text-gray-700"
+                              >
+                                v
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      {!projectCollapsed &&
+                        projectGroup.sessions.map(renderSessionRow)}
+                    </Fragment>
+                  );
+                })}
             </tbody>
           );
         })}

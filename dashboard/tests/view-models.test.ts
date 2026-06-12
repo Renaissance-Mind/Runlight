@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  groupSessionsByDeviceAndProject,
   groupSessionsByDevice,
   groupSessionsByProject,
   mergeProjectOrder,
@@ -147,6 +148,72 @@ describe("pet-ready session view models", () => {
           deviceName: "Unknown device",
           deviceMeta: null,
           sessionIds: ["s5"],
+        },
+      ],
+    );
+  });
+
+  it("nests project groups inside each device group", () => {
+    const groups = groupSessionsByDeviceAndProject([
+      {
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        workspace_project_name: "Runlight",
+        workspace_cwd: "/Users/chunqiu/workspace/Runlight",
+        session_id: "s1",
+      },
+      {
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        workspace_project_name: "PaperBanana",
+        workspace_cwd: "/Users/chunqiu/workspace/PaperBanana",
+        session_id: "s2",
+      },
+      {
+        machine_id: "mid-2",
+        machine_hostname: "linux-box",
+        machine_os: "linux",
+        machine_user: "ubuntu",
+        workspace_project_name: "Runlight",
+        workspace_cwd: "/home/ubuntu/Runlight",
+        session_id: "s3",
+      },
+      {
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        workspace_project_name: "Runlight",
+        workspace_cwd: "/Users/chunqiu/workspace/Runlight/server",
+        session_id: "s4",
+      },
+    ]);
+
+    assert.deepEqual(
+      groups.map((deviceGroup) => ({
+        deviceName: deviceGroup.deviceName,
+        projects: deviceGroup.projectGroups.map((projectGroup) => ({
+          projectName: projectGroup.projectName,
+          sessionIds: projectGroup.sessions.map((session) => session.session_id),
+        })),
+      })),
+      [
+        {
+          deviceName: "studio-mac",
+          projects: [
+            { projectName: "Runlight", sessionIds: ["s1", "s4"] },
+            { projectName: "PaperBanana", sessionIds: ["s2"] },
+          ],
+        },
+        {
+          deviceName: "linux-box",
+          projects: [
+            { projectName: "Runlight", sessionIds: ["s3"] },
+          ],
         },
       ],
     );

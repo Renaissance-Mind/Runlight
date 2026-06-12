@@ -30,6 +30,12 @@ export interface DeviceSessionGroup<T extends DeviceSessionInput> {
   sessions: T[];
 }
 
+export interface DeviceProjectSessionGroup<
+  T extends DeviceSessionInput & ProjectSessionInput,
+> extends DeviceSessionGroup<T> {
+  projectGroups: ProjectSessionGroup<T>[];
+}
+
 export interface SessionSurfaceCounts {
   running: number;
   finished: number;
@@ -117,6 +123,15 @@ export function groupSessionsByDevice<T extends DeviceSessionInput>(
   }
 
   return Array.from(groups.values());
+}
+
+export function groupSessionsByDeviceAndProject<
+  T extends DeviceSessionInput & ProjectSessionInput,
+>(sessions: T[]): DeviceProjectSessionGroup<T>[] {
+  return groupSessionsByDevice(sessions).map((deviceGroup) => ({
+    ...deviceGroup,
+    projectGroups: groupSessionsByProject(deviceGroup.sessions),
+  }));
 }
 
 export function groupSessionsByProject<T extends ProjectSessionInput>(
