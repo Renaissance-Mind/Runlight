@@ -4,7 +4,7 @@
   "description": "Local daemon and CLI for forwarding agent lifecycle events to Runlight.",
   "type": "module",
   "bin": {
-    "runlight": "./bin/runlight.js"
+    "runlight": "bin/runlight.js"
   },
   "scripts": {
     "test": "node --test tests/local/*.test.mjs",
