@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  groupSessionsByDevice,
   groupSessionsByProject,
   mergeProjectOrder,
   moveProjectInOrder,
@@ -78,6 +79,75 @@ describe("pet-ready session view models", () => {
         { projectName: "Runlight", sessionIds: ["s1", "s3"] },
         { projectName: "Flow-Factory", sessionIds: ["s2"] },
         { projectName: "Unknown project", sessionIds: ["s4"] },
+      ],
+    );
+  });
+
+  it("groups sessions by device using machine id as the stable key", () => {
+    const groups = groupSessionsByDevice([
+      {
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        session_id: "s1",
+      },
+      {
+        machine_id: null,
+        machine_hostname: "remote-linux",
+        machine_os: "linux",
+        machine_user: null,
+        session_id: "s2",
+      },
+      {
+        machine_id: "mid-1",
+        machine_hostname: "studio-mac-renamed",
+        machine_os: "darwin",
+        machine_user: "chunqiu",
+        session_id: "s3",
+      },
+      {
+        machine_id: null,
+        machine_hostname: "remote-linux",
+        machine_os: "linux",
+        machine_user: null,
+        session_id: "s4",
+      },
+      {
+        machine_id: null,
+        machine_hostname: null,
+        machine_os: null,
+        machine_user: null,
+        session_id: "s5",
+      },
+    ]);
+
+    assert.deepEqual(
+      groups.map((group) => ({
+        deviceKey: group.deviceKey,
+        deviceName: group.deviceName,
+        deviceMeta: group.deviceMeta,
+        sessionIds: group.sessions.map((session) => session.session_id),
+      })),
+      [
+        {
+          deviceKey: "id:mid-1",
+          deviceName: "studio-mac",
+          deviceMeta: "darwin / chunqiu",
+          sessionIds: ["s1", "s3"],
+        },
+        {
+          deviceKey: "host:remote-linux",
+          deviceName: "remote-linux",
+          deviceMeta: "linux",
+          sessionIds: ["s2", "s4"],
+        },
+        {
+          deviceKey: "unknown",
+          deviceName: "Unknown device",
+          deviceMeta: null,
+          sessionIds: ["s5"],
+        },
       ],
     );
   });

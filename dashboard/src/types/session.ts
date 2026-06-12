@@ -10,6 +10,9 @@ export interface Session {
   summary_inferred: boolean;
   machine_hostname: string | null;
   machine_os: string | null;
+  machine_arch: string | null;
+  machine_user: string | null;
+  machine_id: string | null;
   workspace_cwd: string | null;
   workspace_git_branch: string | null;
   workspace_project_name: string | null;

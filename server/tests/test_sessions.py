@@ -46,6 +46,31 @@ class TestSessionQueries:
         assert "sess-live-2" in ids
         assert "sess-done" not in ids
 
+    async def test_session_api_returns_machine_identity_fields(self, client):
+        await client.post(
+            "/api/events",
+            json=_make_event(
+                session_id="sess-machine",
+                machine={
+                    "hostname": "studio-mac",
+                    "os": "darwin",
+                    "arch": "arm64",
+                    "user": "chunqiu",
+                    "machine_id": "machine-1",
+                },
+            ),
+        )
+
+        resp = await client.get("/api/sessions/sess-machine")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["machine_hostname"] == "studio-mac"
+        assert data["machine_os"] == "darwin"
+        assert data["machine_arch"] == "arm64"
+        assert data["machine_user"] == "chunqiu"
+        assert data["machine_id"] == "machine-1"
+
     async def test_refresh_session_statuses_marks_old_hook_activity_stale(
         self, db_session
     ):

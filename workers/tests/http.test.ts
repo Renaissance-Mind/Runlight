@@ -24,4 +24,10 @@ describe("worker HTTP contract", () => {
     assert.match(indexSource, /pathname\.startsWith\("\/api\/"\)/);
     assert.match(indexSource, /API route not found/);
   });
+
+  it("exposes machine identity fields for dashboard device grouping", () => {
+    assert.match(sessionsSource, /machine_arch:\s*row\.machine_arch/);
+    assert.match(sessionsSource, /machine_user:\s*row\.machine_user/);
+    assert.match(sessionsSource, /machine_id:\s*row\.machine_id/);
+  });
 });

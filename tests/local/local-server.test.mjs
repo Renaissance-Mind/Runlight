@@ -27,7 +27,13 @@ function event(sessionId, eventType = "message.finished") {
     event_time: new Date().toISOString(),
     severity: "info",
     summary: "Local event",
-    machine: { hostname: "local-mac" },
+    machine: {
+      hostname: "local-mac",
+      os: "darwin",
+      arch: "arm64",
+      user: "chunqiu",
+      machine_id: "local-machine-1",
+    },
     workspace: {
       cwd: "/tmp/runlight",
       project_name: "runlight",
@@ -57,6 +63,9 @@ describe("embedded local server", () => {
     assert.equal(sessions.sessions.length, 1);
     assert.equal(sessions.sessions[0].session_id, "sess-local");
     assert.equal(sessions.sessions[0].user_id, "default");
+    assert.equal(sessions.sessions[0].machine_id, "local-machine-1");
+    assert.equal(sessions.sessions[0].machine_user, "chunqiu");
+    assert.equal(sessions.sessions[0].machine_arch, "arm64");
     assert.equal(sessions.sessions[0].workspace_project_name, "runlight");
     assert.equal(sessions.sessions[0].current_status, "finished");
 

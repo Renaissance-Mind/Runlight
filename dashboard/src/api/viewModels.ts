@@ -16,6 +16,20 @@ export interface ProjectSessionGroup<T extends ProjectSessionInput> {
   sessions: T[];
 }
 
+export interface DeviceSessionInput {
+  machine_hostname: string | null;
+  machine_os: string | null;
+  machine_user?: string | null;
+  machine_id?: string | null;
+}
+
+export interface DeviceSessionGroup<T extends DeviceSessionInput> {
+  deviceKey: string;
+  deviceName: string;
+  deviceMeta: string | null;
+  sessions: T[];
+}
+
 export interface SessionSurfaceCounts {
   running: number;
   finished: number;
@@ -51,6 +65,58 @@ export function getSessionProjectName(session: ProjectSessionInput): string {
 
   const parts = cwd.split("/").filter(Boolean);
   return parts[parts.length - 1] || "Unknown project";
+}
+
+function cleanLabel(value: string | null | undefined): string | null {
+  const cleaned = value?.trim();
+  return cleaned ? cleaned : null;
+}
+
+export function getSessionDeviceKey(session: DeviceSessionInput): string {
+  const machineId = cleanLabel(session.machine_id);
+  if (machineId) return `id:${machineId}`;
+
+  const hostname = cleanLabel(session.machine_hostname);
+  if (hostname) return `host:${hostname}`;
+
+  return "unknown";
+}
+
+export function getSessionDeviceName(session: DeviceSessionInput): string {
+  return (
+    cleanLabel(session.machine_hostname) ||
+    cleanLabel(session.machine_id) ||
+    "Unknown device"
+  );
+}
+
+export function getSessionDeviceMeta(session: DeviceSessionInput): string | null {
+  const parts = [cleanLabel(session.machine_os), cleanLabel(session.machine_user)]
+    .filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(" / ") : null;
+}
+
+export function groupSessionsByDevice<T extends DeviceSessionInput>(
+  sessions: T[],
+): DeviceSessionGroup<T>[] {
+  const groups = new Map<string, DeviceSessionGroup<T>>();
+
+  for (const session of sessions) {
+    const deviceKey = getSessionDeviceKey(session);
+    const group = groups.get(deviceKey);
+    if (group) {
+      group.sessions.push(session);
+    } else {
+      groups.set(deviceKey, {
+        deviceKey,
+        deviceName: getSessionDeviceName(session),
+        deviceMeta: getSessionDeviceMeta(session),
+        sessions: [session],
+      });
+    }
+  }
+
+  return Array.from(groups.values());
 }
 
 export function groupSessionsByProject<T extends ProjectSessionInput>(

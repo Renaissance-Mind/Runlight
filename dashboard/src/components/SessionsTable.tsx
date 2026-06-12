@@ -2,16 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Session } from "../types/session";
 import {
-  groupSessionsByProject,
-  mergeProjectOrder,
-  moveProjectInOrder,
+  groupSessionsByDevice,
+  mergeProjectOrder as mergeDeviceOrder,
+  moveProjectInOrder as moveDeviceInOrder,
 } from "../api/viewModels";
 import StatusBadge from "./StatusBadge";
 import AgentIcon from "./AgentIcon";
 
-const PROJECT_ORDER_STORAGE_KEY = "runlight.dashboard.project-order.v1";
-const COLLAPSED_PROJECTS_STORAGE_KEY =
-  "runlight.dashboard.collapsed-projects.v1";
+const DEVICE_ORDER_STORAGE_KEY = "runlight.dashboard.device-order.v1";
+const COLLAPSED_DEVICES_STORAGE_KEY =
+  "runlight.dashboard.collapsed-devices.v1";
 
 function parseUTC(isoStr: string): number {
   return new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
@@ -89,69 +89,69 @@ interface Props {
 }
 
 export default function SessionsTable({ sessions, loading, error }: Props) {
-  const projectGroups = useMemo(
-    () => groupSessionsByProject(sessions),
+  const deviceGroups = useMemo(
+    () => groupSessionsByDevice(sessions),
     [sessions],
   );
-  const projectNames = useMemo(
-    () => projectGroups.map((group) => group.projectName),
-    [projectGroups],
+  const deviceKeys = useMemo(
+    () => deviceGroups.map((group) => group.deviceKey),
+    [deviceGroups],
   );
-  const [projectOrder, setProjectOrder] = useState(() =>
-    readStoredStringList(PROJECT_ORDER_STORAGE_KEY),
+  const [deviceOrder, setDeviceOrder] = useState(() =>
+    readStoredStringList(DEVICE_ORDER_STORAGE_KEY),
   );
-  const [collapsedProjects, setCollapsedProjects] = useState(() =>
-    readStoredStringList(COLLAPSED_PROJECTS_STORAGE_KEY),
+  const [collapsedDevices, setCollapsedDevices] = useState(() =>
+    readStoredStringList(COLLAPSED_DEVICES_STORAGE_KEY),
   );
 
   useEffect(() => {
-    if (projectNames.length === 0) return;
-    setProjectOrder((previousOrder) => {
-      const nextOrder = mergeProjectOrder(projectNames, previousOrder);
+    if (deviceKeys.length === 0) return;
+    setDeviceOrder((previousOrder) => {
+      const nextOrder = mergeDeviceOrder(deviceKeys, previousOrder);
       if (nextOrder.join("\u0000") === previousOrder.join("\u0000")) {
         return previousOrder;
       }
-      writeStoredStringList(PROJECT_ORDER_STORAGE_KEY, nextOrder);
+      writeStoredStringList(DEVICE_ORDER_STORAGE_KEY, nextOrder);
       return nextOrder;
     });
-  }, [projectNames]);
+  }, [deviceKeys]);
 
-  const orderedProjectNames = useMemo(
-    () => mergeProjectOrder(projectNames, projectOrder),
-    [projectNames, projectOrder],
+  const orderedDeviceKeys = useMemo(
+    () => mergeDeviceOrder(deviceKeys, deviceOrder),
+    [deviceKeys, deviceOrder],
   );
-  const groupsByProject = useMemo(
-    () => new Map(projectGroups.map((group) => [group.projectName, group])),
-    [projectGroups],
+  const groupsByDevice = useMemo(
+    () => new Map(deviceGroups.map((group) => [group.deviceKey, group])),
+    [deviceGroups],
   );
-  const orderedProjectGroups = orderedProjectNames
-    .map((name) => groupsByProject.get(name))
+  const orderedDeviceGroups = orderedDeviceKeys
+    .map((key) => groupsByDevice.get(key))
     .filter((group): group is NonNullable<typeof group> => Boolean(group));
-  const collapsedProjectSet = useMemo(
-    () => new Set(collapsedProjects),
-    [collapsedProjects],
+  const collapsedDeviceSet = useMemo(
+    () => new Set(collapsedDevices),
+    [collapsedDevices],
   );
   const columnCount = 11;
 
-  const toggleProject = (projectName: string) => {
-    setCollapsedProjects((previousProjects) => {
-      const nextProjects = new Set(previousProjects);
-      if (nextProjects.has(projectName)) {
-        nextProjects.delete(projectName);
+  const toggleDevice = (deviceKey: string) => {
+    setCollapsedDevices((previousDevices) => {
+      const nextDevices = new Set(previousDevices);
+      if (nextDevices.has(deviceKey)) {
+        nextDevices.delete(deviceKey);
       } else {
-        nextProjects.add(projectName);
+        nextDevices.add(deviceKey);
       }
-      const nextList = Array.from(nextProjects);
-      writeStoredStringList(COLLAPSED_PROJECTS_STORAGE_KEY, nextList);
+      const nextList = Array.from(nextDevices);
+      writeStoredStringList(COLLAPSED_DEVICES_STORAGE_KEY, nextList);
       return nextList;
     });
   };
 
-  const moveProject = (projectName: string, direction: "up" | "down") => {
-    setProjectOrder((previousOrder) => {
-      const currentOrder = mergeProjectOrder(projectNames, previousOrder);
-      const nextOrder = moveProjectInOrder(currentOrder, projectName, direction);
-      writeStoredStringList(PROJECT_ORDER_STORAGE_KEY, nextOrder);
+  const moveDevice = (deviceKey: string, direction: "up" | "down") => {
+    setDeviceOrder((previousOrder) => {
+      const currentOrder = mergeDeviceOrder(deviceKeys, previousOrder);
+      const nextOrder = moveDeviceInOrder(currentOrder, deviceKey, direction);
+      writeStoredStringList(DEVICE_ORDER_STORAGE_KEY, nextOrder);
       return nextOrder;
     });
   };
@@ -186,7 +186,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
             <th className="px-3 py-2">Pin</th>
             <th className="px-3 py-2">Agent</th>
             <th className="px-3 py-2">Session</th>
-            <th className="px-3 py-2">Machine</th>
+            <th className="px-3 py-2">Project</th>
             <th className="px-3 py-2">Path</th>
             <th className="px-3 py-2">Branch</th>
             <th className="px-3 py-2">Event</th>
@@ -194,30 +194,35 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
             <th className="px-3 py-2 text-right">Dur</th>
           </tr>
         </thead>
-        {orderedProjectGroups.map((group, index) => {
-          const isCollapsed = collapsedProjectSet.has(group.projectName);
+        {orderedDeviceGroups.map((group, index) => {
+          const isCollapsed = collapsedDeviceSet.has(group.deviceKey);
           const isFirst = index === 0;
-          const isLast = index === orderedProjectGroups.length - 1;
+          const isLast = index === orderedDeviceGroups.length - 1;
 
           return (
-            <tbody key={group.projectName}>
+            <tbody key={group.deviceKey}>
               <tr className="border-b border-surface-3/70 bg-surface-2/60">
                 <td colSpan={columnCount} className="px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => toggleProject(group.projectName)}
+                        onClick={() => toggleDevice(group.deviceKey)}
                         className="h-5 w-5 text-gray-500 hover:text-white"
-                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${group.projectName}`}
+                        aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${group.deviceName}`}
                         aria-expanded={!isCollapsed}
                         title={isCollapsed ? "Expand" : "Collapse"}
                       >
                         {isCollapsed ? ">" : "v"}
                       </button>
                       <span className="truncate text-xs font-semibold text-gray-400">
-                        {group.projectName}
+                        {group.deviceName}
                       </span>
+                      {group.deviceMeta && (
+                        <span className="hidden shrink-0 text-[10px] text-gray-600 sm:inline">
+                          {group.deviceMeta}
+                        </span>
+                      )}
                       <span className="shrink-0 text-[10px] text-gray-600">
                         {group.sessions.length} session(s)
                       </span>
@@ -225,9 +230,9 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => moveProject(group.projectName, "up")}
+                        onClick={() => moveDevice(group.deviceKey, "up")}
                         disabled={isFirst}
-                        aria-label={`Move ${group.projectName} up`}
+                        aria-label={`Move ${group.deviceName} up`}
                         title="Move up"
                         className="px-1.5 py-0.5 text-[10px] text-gray-500 hover:text-white disabled:cursor-not-allowed disabled:text-gray-700"
                       >
@@ -235,9 +240,9 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => moveProject(group.projectName, "down")}
+                        onClick={() => moveDevice(group.deviceKey, "down")}
                         disabled={isLast}
-                        aria-label={`Move ${group.projectName} down`}
+                        aria-label={`Move ${group.deviceName} down`}
                         title="Move down"
                         className="px-1.5 py-0.5 text-[10px] text-gray-500 hover:text-white disabled:cursor-not-allowed disabled:text-gray-700"
                       >
@@ -289,7 +294,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                       </Link>
                     </td>
                     <td className="px-3 py-2 text-gray-400">
-                      {s.machine_hostname || "-"}
+                      {s.workspace_project_name || "-"}
                     </td>
                     <td className="px-3 py-2 text-gray-400">
                       {shortPath(s.workspace_cwd)}
