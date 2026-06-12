@@ -127,7 +127,8 @@ npm install -g .
 runlight setup
 ```
 
-The setup flow opens the hosted dashboard, asks for your upload token, starts
+The setup flow opens a browser connect page, signs you in, creates an upload
+token automatically, asks you to paste that token back into the terminal, starts
 the local daemon, installs Codex and Claude hooks, and keeps future events
 flowing through the daemon.
 
@@ -144,7 +145,8 @@ runlight status
 Start a fresh Codex or Claude Code session after installing hooks, then watch it
 appear in the dashboard.
 
-For advanced/manual setup, use `runlight login`, `runlight daemon start`, and
+For advanced/manual setup, open `/connect` on your Runlight server, copy the
+token shown there, then use `runlight login`, `runlight daemon start`, and
 `runlight plugin <codex|claude>`.
 
 To disconnect this machine from Runlight:
@@ -314,7 +316,7 @@ npm run deploy
 ```
 
 The hosted dashboard uses GitHub or Google OAuth sessions. After signing in,
-open Settings and generate an upload token for agent hooks. Set
+open `/connect` to generate and display an upload token for agent hooks. Set
 `PUBLIC_BASE_URL` to the dashboard origin, for example
 `https://runlight.renaissancemind.ai`. OAuth callbacks are
 `/auth/callback/github` and `/auth/callback/google`. `RUNLIGHT_TOKEN_MAP`

@@ -103,12 +103,12 @@ async function runLogin(opts) {
   intro("Runlight Login");
   note("Dashboard", [
     `Server: ${serverUrl}`,
-    "Create an upload token from Settings > Upload tokens.",
+    "Sign in from the browser page and copy the upload token it shows.",
   ]);
-  if (!token && await confirm("Open Runlight settings in your browser?", { defaultValue: true })) {
-    openUrl(`${serverUrl}/settings`);
+  if (!token && await confirm("Open Runlight connect page in your browser?", { defaultValue: true })) {
+    openUrl(`${serverUrl}/connect`);
   }
-  if (!token) token = await promptSecret("Upload token");
+  if (!token) token = await promptSecret("Upload token from browser");
   if (!token) throw new Error("Upload token is required");
   const config = await updateConfig({ server_url: serverUrl, upload_token: token });
   outro(`Saved Runlight credentials in ${resolvePaths().config}`);
@@ -284,7 +284,7 @@ async function runSetting(positional) {
   while (!done) {
     const choice = await select("Choose a setting", [
       { value: "server", label: "Server URL", hint: "Cloudflare Worker or self-hosted server" },
-      { value: "token", label: "Upload token", hint: "Generated from Dashboard Settings" },
+      { value: "token", label: "Upload token", hint: "Generated from the browser connect page" },
       { value: "port", label: "Daemon port", hint: "Local 127.0.0.1 listener" },
       { value: "plugins", label: "Install plugins", hint: "Codex and Claude hooks" },
       { value: "show", label: "Show config path" },
@@ -332,10 +332,16 @@ async function runSetup(opts = {}) {
   ]);
   const current = await loadOrCreateConfig();
   const serverUrl = normalizeServerUrl(opts.server || current.server_url || DEFAULT_SERVER_URL);
-  note("Dashboard", [`Server: ${serverUrl}`]);
-  if (!opts.noOpen) openUrl(`${serverUrl}/settings`);
   let token = String(opts.token || current.upload_token || "").trim();
-  if (!token) token = await promptSecret("Paste upload token");
+  note("Dashboard", [`Server: ${serverUrl}`]);
+  if (!token) {
+    note("Browser setup", [
+      "The page will sign you in and create an upload token automatically.",
+      "Copy the token shown there and paste it here.",
+    ]);
+    if (!opts.noOpen) openUrl(`${serverUrl}/connect`);
+    token = await promptSecret("Paste upload token from browser");
+  }
   if (!token) throw new Error("Upload token is required");
   await updateConfig({ server_url: serverUrl, upload_token: token });
   const daemon = await startDaemon();

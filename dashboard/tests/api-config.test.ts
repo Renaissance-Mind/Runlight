@@ -106,6 +106,10 @@ describe("dashboard server connection config", () => {
       buildApiUrl("https://runlight.example.com/settings", "/tokens"),
       "https://runlight.example.com/api/tokens",
     );
+    assert.equal(
+      buildApiUrl("https://runlight.example.com/connect", "/tokens"),
+      "https://runlight.example.com/api/tokens",
+    );
   });
 
   it("builds OAuth login URLs from the configured server origin", () => {

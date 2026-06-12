@@ -1,8 +1,8 @@
 # Runlight - Cloudflare Workers + D1
 
 Serverless deployment of Runlight on Cloudflare. API-compatible with the
-Python/FastAPI server. Hosted users sign in to the dashboard with GitHub or
-Google, generate an upload token, and configure the local npm CLI/daemon to
+Python/FastAPI server. Hosted users sign in through the browser connect page,
+copy the upload token shown there, and configure the local npm CLI/daemon to
 upload agent events.
 
 ## Prerequisites
@@ -70,9 +70,9 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
 For agent hook uploads, sign in to the deployed dashboard after the first
-deploy, open Settings, and generate an upload token. Static `RUNLIGHT_TOKEN_MAP`
-secrets are still supported for controlled small-team deployments, but they are
-not required for the hosted OAuth flow.
+deploy, open `/connect`, and copy the upload token shown there. Static
+`RUNLIGHT_TOKEN_MAP` secrets are still supported for controlled small-team
+deployments, but they are not required for the hosted OAuth flow.
 
 ### 5. Deploy
 

@@ -132,7 +132,7 @@ For multi-user remote access with self-service registration.
 ```
 
 - `server_url`: Pre-configured in the cloud-hosted plugin preset. Users don't need to set it.
-- `token`: Obtained through OAuth flow in browser, or manually copied from dashboard settings page.
+- `token`: Obtained through the browser `/connect` flow, or pasted directly for manual setup.
 
 ---
 

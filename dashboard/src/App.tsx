@@ -7,6 +7,7 @@ import SessionDetail from "./components/SessionDetail";
 import FloatingHUD from "./components/FloatingHUD";
 import SettingsPage from "./components/SettingsPage";
 import MessagesPage from "./components/MessagesPage";
+import ConnectPage from "./components/ConnectPage";
 import {
   buildAuthLoginUrl,
   readStoredDashboardConfig,
@@ -102,7 +103,17 @@ function Dashboard({ config, prefs }: { config: DashboardConnectionConfig; prefs
   );
 }
 
-function LoginScreen({ config, error }: { config: DashboardConnectionConfig; error: string | null }) {
+function LoginScreen({
+  config,
+  error,
+  title = "Runlight",
+  subtitle = "Sign in to view live agent sessions.",
+}: {
+  config: DashboardConnectionConfig;
+  error: string | null;
+  title?: string;
+  subtitle?: string;
+}) {
   const returnTo = typeof window === "undefined"
     ? "/"
     : `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -111,8 +122,8 @@ function LoginScreen({ config, error }: { config: DashboardConnectionConfig; err
     <main className="min-h-screen grid place-items-center px-4">
       <section className="w-full max-w-sm border border-surface-3 bg-surface-1 rounded-lg p-5 space-y-4">
         <div>
-          <h1 className="text-sm font-bold text-white tracking-tight">Runlight</h1>
-          <p className="text-xs text-gray-500 mt-1">Sign in to view live agent sessions.</p>
+          <h1 className="text-sm font-bold text-white tracking-tight">{title}</h1>
+          <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
         </div>
         <div className="grid gap-2">
           <a
@@ -160,7 +171,15 @@ export default function App() {
   const loggedInWithCookie = probe?.ok && !config.token.trim() && probe.userId && probe.userId !== "default";
 
   if (authRequired) {
-    return <LoginScreen config={config} error={probe?.error ?? null} />;
+    const isConnect = typeof window !== "undefined" && window.location.pathname === "/connect";
+    return (
+      <LoginScreen
+        config={config}
+        error={probe?.error ?? null}
+        title={isConnect ? "Connect Runlight CLI" : "Runlight"}
+        subtitle={isConnect ? "Sign in to create an upload token." : "Sign in to view live agent sessions."}
+      />
+    );
   }
 
   const doLogout = async () => {
@@ -202,6 +221,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard config={config} prefs={prefs} />} />
         <Route path="/messages" element={<MessagesPage config={config} />} />
+        <Route path="/connect" element={<ConnectPage config={config} />} />
         <Route
           path="/sessions/:sessionId"
           element={

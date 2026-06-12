@@ -23,6 +23,10 @@ describe("local config normalization", () => {
       normalizeServerUrl("https://runlight.example.com/settings"),
       "https://runlight.example.com",
     );
+    assert.equal(
+      normalizeServerUrl("https://runlight.example.com/connect"),
+      "https://runlight.example.com",
+    );
   });
 
   it("clears the upload token while preserving local identity", async () => {

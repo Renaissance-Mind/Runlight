@@ -31,6 +31,7 @@ function normalizeServerUrl(serverUrl: string): string {
 
     if (
       url.pathname === "/settings"
+      || url.pathname === "/connect"
       || url.pathname === "/messages"
       || url.pathname.startsWith("/sessions/")
     ) {
