@@ -3,12 +3,12 @@ import os from "node:os";
 import path from "node:path";
 
 const CODEX_EVENTS = [
-  ["SessionStart", 5000],
-  ["PreToolUse", 3000],
-  ["PostToolUse", 3000],
-  ["PostToolUseFailure", 3000],
-  ["UserPromptSubmit", 3000],
-  ["Stop", 5000],
+  ["SessionStart", 5],
+  ["PreToolUse", 3],
+  ["PostToolUse", 3],
+  ["PostToolUseFailure", 3],
+  ["UserPromptSubmit", 3],
+  ["Stop", 5],
 ];
 
 const CLAUDE_EVENTS = [
@@ -67,7 +67,7 @@ export async function installCodexPlugin({ env = process.env, command } = {}) {
   for (const [event, timeout] of CODEX_EVENTS) {
     config.hooks[event] = pruneHookEntries(config.hooks[event], "codex");
     config.hooks[event].push({
-      hooks: [{ type: "command", command: commandFor("codex", command), timeout_ms: timeout }],
+      hooks: [{ type: "command", command: commandFor("codex", command), timeout }],
     });
   }
   await writeJsonFile(hooksFile, config);

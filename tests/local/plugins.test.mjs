@@ -18,7 +18,8 @@ describe("local plugin installers", () => {
     const hooks = JSON.parse(await fs.readFile(result.hooksFile, "utf8"));
 
     assert.equal(hooks.hooks.SessionStart[0].hooks[0].command, "node /repo/bin/runlight.js hook codex");
-    assert.equal(hooks.hooks.PreToolUse[0].hooks[0].timeout_ms, 3000);
+    assert.equal(hooks.hooks.PreToolUse[0].hooks[0].timeout, 3);
+    assert.equal(hooks.hooks.PreToolUse[0].hooks[0].timeout_ms, undefined);
 
     const status = await pluginStatus({ env });
     assert.equal(status.codex.installed, true);

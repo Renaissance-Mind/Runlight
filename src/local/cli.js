@@ -54,25 +54,39 @@ function printJson(value) {
   console.log(JSON.stringify(value, null, 2));
 }
 
+async function healthPayload(response, expectedService) {
+  const text = await response.text();
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      status: response.status,
+      body: text,
+      error: "Expected JSON health response",
+    };
+  }
+  const serviceMatches = !expectedService || data.service === expectedService;
+  return {
+    ok: response.ok && data.status === "ok" && serviceMatches,
+    status: response.status,
+    body: text,
+    ...(serviceMatches ? {} : { error: `Expected service ${expectedService}, got ${data.service || "unknown"}` }),
+  };
+}
+
 async function serverHealth(serverUrl, token) {
   const health = await fetch(`${serverUrl}/api/health`);
   const result = {
-    public: {
-      ok: health.ok,
-      status: health.status,
-      body: await health.text(),
-    },
+    public: await healthPayload(health, "runlight"),
     ingest: null,
   };
   if (token) {
     const ingest = await fetch(`${serverUrl}/api/ingest/health`, {
       headers: { authorization: `Bearer ${token}` },
     });
-    result.ingest = {
-      ok: ingest.ok,
-      status: ingest.status,
-      body: await ingest.text(),
-    };
+    result.ingest = await healthPayload(ingest, "runlight-ingest");
   }
   return result;
 }
