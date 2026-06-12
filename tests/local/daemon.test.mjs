@@ -97,6 +97,45 @@ describe("local daemon", () => {
     assert.equal(received[0].body.events[0].session_id, "sess-daemon");
   });
 
+  it("keeps pending events and stays reachable when remote upload fails", async () => {
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const config = defaultConfig(env);
+    config.server_url = "https://runlight.invalid";
+    config.upload_token = "upload-token";
+    config.daemon.port = 0;
+    await saveConfig(config, env);
+
+    const daemon = await createDaemonServer({
+      env,
+      fetchImpl: async () => {
+        throw new Error("network unavailable");
+      },
+    });
+    servers.push(() => daemon.close());
+
+    const response = await fetch(`http://127.0.0.1:${daemon.server.address().port}/events`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify(testEvent()),
+    });
+    assert.equal(response.status, 202);
+
+    await daemon.flush();
+    const statusResponse = await fetch(`http://127.0.0.1:${daemon.server.address().port}/status`, {
+      headers: { "x-runlight-local-secret": config.local_secret },
+    });
+    assert.equal(statusResponse.status, 200);
+    const status = await statusResponse.json();
+    assert.equal(status.status, "ok");
+    assert.equal(status.pending_count, 1);
+    assert.equal(status.state.upload_status, "error");
+    assert.match(status.state.upload_error, /network unavailable/);
+  });
+
   it("enriches raw hook events with Codex pin, title, and automation metadata before upload", async () => {
     const received = [];
     const remote = http.createServer((req, res) => {

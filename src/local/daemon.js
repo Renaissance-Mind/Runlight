@@ -135,14 +135,24 @@ export async function flushPending({ config, paths, fetchImpl = fetch } = {}) {
     return writeState(paths, { upload_status: "idle", pending_count: pending });
   }
 
-  const response = await fetchImpl(`${config.server_url}/api/events`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${config.upload_token}`,
-    },
-    body: JSON.stringify({ events: batch.events }),
-  });
+  let response;
+  try {
+    response = await fetchImpl(`${config.server_url}/api/events`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${config.upload_token}`,
+      },
+      body: JSON.stringify({ events: batch.events }),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return writeState(paths, {
+      upload_status: "error",
+      upload_error: `Upload failed: ${detail.slice(0, 240)}`,
+      pending_count: pending,
+    });
+  }
 
   if (!response.ok) {
     const detail = await response.text();
