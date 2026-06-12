@@ -1,17 +1,43 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import os from "node:os";
+import { createDashboardServer } from "./dashboard.js";
 import { installLaunchAgent, queryDaemon, runDaemon, startDaemon, stopDaemon } from "./daemon.js";
+import { createLocalServer } from "./local-server.js";
+import {
+  findAvailablePort,
+  normalizeListenPort,
+  startManagedDashboard,
+  startManagedServer,
+  stopManagedPidFile,
+} from "./managed.js";
 import { clearUploadToken, loadConfig, loadOrCreateConfig, normalizeServerUrl, redactConfig, updateConfig } from "./config.js";
-import { DEFAULT_SERVER_URL, localDaemonUrl, resolvePaths } from "./paths.js";
+import {
+  DEFAULT_DAEMON_PORT,
+  DEFAULT_DASHBOARD_PORT,
+  DEFAULT_LOCAL_SERVER_PORT,
+  DEFAULT_SERVER_URL,
+  localDaemonUrl,
+  resolvePaths,
+} from "./paths.js";
 import { installClaudePlugin, installCodexPlugin, pluginStatus, uninstallClaudePlugin, uninstallCodexPlugin } from "./plugins.js";
 import { postHookInput, readStdin } from "./hook.js";
 import { confirm, intro, note, openUrl, outro, promptSecret, promptText, select } from "./prompts.js";
+import {
+  buildLocalConfigPatch,
+  buildSelfHostedClientConfigPatch,
+  normalizeSelfHostedServerUrl,
+  setupModeFromOptions,
+} from "./setup-plan.js";
 
 function printHelp() {
   console.log(`Runlight local CLI
 
 Usage:
   runlight setup [--token <token>] [--server <url>]
+  runlight setup --local
+  runlight setup --cloud
+  runlight setup --self-hosted [--role <server|client|both>]
   runlight login [--server <url>] [--token <token>]
   runlight logout [--json] [--keep-hooks] [--keep-daemon]
   runlight status [--json]
@@ -19,6 +45,8 @@ Usage:
   runlight setting
   runlight plugin <codex|claude|all> [--uninstall]
   runlight daemon <run|start|stop|restart|install>
+  runlight server <run|start|stop>
+  runlight dashboard <run|start|stop>
   runlight hook <codex|claude>
 
 Environment:
@@ -58,6 +86,15 @@ function parseArgs(argv) {
 
 function printJson(value) {
   console.log(JSON.stringify(value, null, 2));
+}
+
+function localIPv4() {
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      if (entry.family === "IPv4" && !entry.internal) return entry.address;
+    }
+  }
+  return "127.0.0.1";
 }
 
 function sleep(ms) {
@@ -197,12 +234,23 @@ async function stopDaemonIfRunning() {
   }
 }
 
+async function stopManagedIfRunning(pidPath) {
+  try {
+    return await stopManagedPidFile(pidPath);
+  } catch (error) {
+    return { stopped: false, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 async function runLogout(opts) {
   if (!opts.json) intro("Runlight Logout");
   const hooks = opts.keepHooks ? { skipped: true } : await uninstallPlugin("all");
   const daemon = opts.keepDaemon ? { skipped: true } : await stopDaemonIfRunning();
+  const paths = resolvePaths();
+  const server = opts.keepServer ? { skipped: true } : await stopManagedIfRunning(paths.serverPid);
+  const dashboard = opts.keepDashboard ? { skipped: true } : await stopManagedIfRunning(paths.dashboardPid);
   const config = await clearUploadToken();
-  const payload = { config: redactConfig(config), daemon, hooks };
+  const payload = { config: redactConfig(config), daemon, server, dashboard, hooks };
   if (opts.json) {
     printJson(payload);
     return payload;
@@ -211,6 +259,8 @@ async function runLogout(opts) {
     "Upload token removed from local config.",
     opts.keepHooks ? "Local hooks left installed." : "Codex and Claude hooks removed.",
     opts.keepDaemon ? "Daemon left running." : daemon.stopped ? "Daemon stopped." : "Daemon was not running.",
+    opts.keepServer ? "Local server left running." : server.stopped ? "Local server stopped." : "Local server was not running.",
+    opts.keepDashboard ? "Dashboard left running." : dashboard.stopped ? "Dashboard stopped." : "Dashboard was not running.",
   ]);
   outro("Run `runlight setup` to connect this machine again.");
   return payload;
@@ -266,6 +316,12 @@ async function runStatus(opts) {
   console.log(`Server URL:   ${config.server_url}`);
   console.log(`Token:        ${config.upload_token ? "configured" : "missing"}`);
   console.log(`Daemon:       ${daemon.status === "ok" ? "running" : "unreachable"}`);
+  if (config.managed?.server?.enabled) {
+    console.log(`Server:       managed at http://${config.managed.server.host}:${config.managed.server.port}`);
+  }
+  if (config.managed?.dashboard?.enabled) {
+    console.log(`Dashboard:    managed at http://${config.managed.dashboard.host}:${config.managed.dashboard.port}`);
+  }
   if (daemon.pending_count !== undefined) console.log(`Queue:        ${daemon.pending_count} pending`);
   console.log(`Codex hook:   ${plugins.codex.installed ? "installed" : "not installed"}`);
   console.log(`Claude hook:  ${plugins.claude.installed ? "installed" : "not installed"}`);
@@ -342,6 +398,67 @@ async function runDaemonCommand(positional) {
   throw new Error(`Unknown daemon action: ${action}`);
 }
 
+async function runServerCommand(positional, opts) {
+  const action = positional[1] || "start";
+  const host = String(opts.host || "127.0.0.1");
+  const port = normalizeListenPort(opts.port, DEFAULT_LOCAL_SERVER_PORT);
+  if (action === "run") {
+    const server = await createLocalServer({ host, port });
+    console.log(`Runlight local server listening on http://${host}:${port}`);
+    await new Promise((resolve) => {
+      const stop = async () => {
+        await server.close();
+        resolve();
+      };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    });
+    return;
+  }
+  if (action === "start") {
+    const result = await startManagedServer({ host, port });
+    printJson(result);
+    return result;
+  }
+  if (action === "stop") {
+    const result = await stopManagedIfRunning(resolvePaths().serverPid);
+    printJson(result);
+    return result;
+  }
+  throw new Error(`Unknown server action: ${action}`);
+}
+
+async function runDashboardCommand(positional, opts) {
+  const action = positional[1] || "start";
+  const host = String(opts.host || "127.0.0.1");
+  const port = normalizeListenPort(opts.port, DEFAULT_DASHBOARD_PORT);
+  const serverUrl = normalizeServerUrl(opts.server || opts.serverUrl || "http://127.0.0.1:18765");
+  if (action === "run") {
+    const dashboard = await createDashboardServer({ host, port, serverUrl });
+    console.log(`Runlight dashboard listening on http://${host}:${port}`);
+    await new Promise((resolve) => {
+      const stop = async () => {
+        await dashboard.close();
+        resolve();
+      };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    });
+    return;
+  }
+  if (action === "start") {
+    const result = await startManagedDashboard({ host, port, serverUrl });
+    printJson(result);
+    return result;
+  }
+  if (action === "stop") {
+    const result = await stopManagedIfRunning(resolvePaths().dashboardPid);
+    printJson(result);
+    return result;
+  }
+  throw new Error(`Unknown dashboard action: ${action}`);
+}
+
 async function runSetting(positional) {
   if (positional[1] === "set") {
     const key = positional[2];
@@ -400,10 +517,22 @@ function printCodexTrustNotice() {
 async function runSetup(opts = {}) {
   intro("Runlight Setup");
   note("What this does", [
-    "Connects this machine to your Runlight dashboard.",
-    "Starts the local daemon.",
-    "Installs local Codex and Claude hooks.",
+    "Connects this machine to a Runlight server.",
+    "Starts the required local services.",
+    "Installs local Codex and Claude hooks when this machine is a client.",
   ]);
+  const explicitMode = setupModeFromOptions(opts);
+  const mode = explicitMode || await select("Choose setup mode", [
+    { value: "cloud", label: "Runlight Cloud", hint: "Use the hosted dashboard" },
+    { value: "local", label: "Local only", hint: "Run server, dashboard, and daemon on this machine" },
+    { value: "self-hosted", label: "Self-hosted", hint: "Connect to or host your own Runlight server" },
+  ]);
+  if (mode === "local") return runLocalSetup(opts);
+  if (mode === "self-hosted") return runSelfHostedSetup(opts);
+  return runCloudSetup(opts);
+}
+
+async function runCloudSetup(opts = {}) {
   const current = await loadOrCreateConfig();
   const serverUrl = normalizeServerUrl(opts.server || current.server_url || DEFAULT_SERVER_URL);
   let token = String(opts.token || current.upload_token || "").trim();
@@ -425,6 +554,122 @@ async function runSetup(opts = {}) {
   if (target === "all" || target === "codex") printCodexTrustNotice();
   outro("Runlight is ready. Run `runlight status` any time to check it.");
   return { serverUrl, daemon, plugins: target };
+}
+
+async function runLocalSetup(opts = {}) {
+  const serverHost = "127.0.0.1";
+  const dashboardHost = "127.0.0.1";
+  const daemonHost = "127.0.0.1";
+  const serverPort = await findAvailablePort(normalizeListenPort(opts.serverPort, DEFAULT_LOCAL_SERVER_PORT), serverHost);
+  const dashboardPort = await findAvailablePort(normalizeListenPort(opts.dashboardPort, DEFAULT_DASHBOARD_PORT), dashboardHost, [serverPort]);
+  const daemonPort = await findAvailablePort(normalizeListenPort(opts.daemonPort, DEFAULT_DAEMON_PORT), daemonHost, [serverPort, dashboardPort]);
+  const patch = buildLocalConfigPatch({ serverHost, serverPort, dashboardHost, dashboardPort, daemonHost, daemonPort });
+  await updateConfig(patch);
+
+  note("Local services", [
+    `Server: http://${serverHost}:${serverPort}`,
+    `Dashboard: http://${dashboardHost}:${dashboardPort}`,
+    `Daemon: http://${daemonHost}:${daemonPort}`,
+  ]);
+  const server = await startManagedServer({ host: serverHost, port: serverPort });
+  const dashboard = await startManagedDashboard({ host: dashboardHost, port: dashboardPort, serverUrl: patch.server_url });
+  const daemon = await startDaemon();
+  const target = setupTargetFromOptions(opts);
+  if (target !== "skip") await installPlugin(target, {});
+  if (!opts.noOpen) openUrl(`http://${dashboardHost}:${dashboardPort}`);
+  if (target === "all" || target === "codex") printCodexTrustNotice();
+  outro("Runlight local setup is ready. Run `runlight status` any time to check it.");
+  return { server, dashboard, daemon, plugins: target, serverUrl: patch.server_url };
+}
+
+async function chooseSelfHostedRole(opts) {
+  const role = String(opts.role || opts.selfHostedRole || "").trim();
+  if (["server", "client", "both"].includes(role)) return role;
+  return select("What should this machine run?", [
+    { value: "server", label: "Server", hint: "Host Runlight server and dashboard here" },
+    { value: "client", label: "Client", hint: "Send this machine's agent events to an existing server" },
+    { value: "both", label: "Both", hint: "Host the server and monitor this same machine" },
+  ]);
+}
+
+async function runSelfHostedSetup(opts = {}) {
+  const role = await chooseSelfHostedRole(opts);
+  if (role === "client") return runSelfHostedClientSetup(opts);
+  if (role === "server") return runSelfHostedServerSetup(opts, { includeClient: false });
+  return runSelfHostedServerSetup(opts, { includeClient: true });
+}
+
+async function runSelfHostedClientSetup(opts = {}) {
+  const defaultAddress = opts.server || opts.serverUrl || "127.0.0.1:18765";
+  const address = opts.server || opts.serverUrl || await promptText("Server address", { defaultValue: defaultAddress });
+  const serverUrl = normalizeSelfHostedServerUrl(address, DEFAULT_LOCAL_SERVER_PORT);
+  const daemonPort = await findAvailablePort(normalizeListenPort(opts.daemonPort, DEFAULT_DAEMON_PORT), "127.0.0.1");
+  const token = String(opts.token || "").trim();
+  await updateConfig(buildSelfHostedClientConfigPatch({ serverUrl, token, daemonPort }));
+  note("Self-hosted client", [`Server: ${serverUrl}`, `Daemon: http://127.0.0.1:${daemonPort}`]);
+  const daemon = await startDaemon();
+  const target = setupTargetFromOptions(opts);
+  if (target !== "skip") await installPlugin(target, {});
+  if (target === "all" || target === "codex") printCodexTrustNotice();
+  outro("Runlight self-hosted client is ready.");
+  return { serverUrl, daemon, plugins: target };
+}
+
+async function runSelfHostedServerSetup(opts = {}, { includeClient = false } = {}) {
+  const bindHost = String(opts.host || "0.0.0.0");
+  const dashboardHost = String(opts.dashboardHost || "0.0.0.0");
+  const preferredServerPort = opts.port || opts.serverPort || await promptText("Server port", { defaultValue: String(DEFAULT_LOCAL_SERVER_PORT) });
+  const serverPort = await findAvailablePort(normalizeListenPort(preferredServerPort, DEFAULT_LOCAL_SERVER_PORT), bindHost);
+  const dashboardPort = await findAvailablePort(normalizeListenPort(opts.dashboardPort, DEFAULT_DASHBOARD_PORT), dashboardHost, [serverPort]);
+  const lanHost = localIPv4();
+  const serverUrl = `http://${includeClient ? lanHost : "127.0.0.1"}:${serverPort}`;
+
+  const server = await startManagedServer({ host: bindHost, port: serverPort });
+  const dashboard = await startManagedDashboard({
+    host: dashboardHost,
+    port: dashboardPort,
+    serverUrl: `http://${lanHost}:${serverPort}`,
+  });
+
+  let daemon = null;
+  let target = "skip";
+  if (includeClient) {
+    const daemonPort = await findAvailablePort(normalizeListenPort(opts.daemonPort, DEFAULT_DAEMON_PORT), "127.0.0.1", [serverPort, dashboardPort]);
+    await updateConfig({
+      server_url: `http://${lanHost}:${serverPort}`,
+      upload_token: "",
+      daemon: {
+        host: "127.0.0.1",
+        port: daemonPort,
+      },
+      managed: {
+        server: { enabled: true, host: bindHost, port: serverPort },
+        dashboard: { enabled: true, host: dashboardHost, port: dashboardPort },
+      },
+    });
+    daemon = await startDaemon();
+    target = setupTargetFromOptions(opts);
+    if (target !== "skip") await installPlugin(target, {});
+    if (target === "all" || target === "codex") printCodexTrustNotice();
+  } else {
+    await updateConfig({
+      server_url: `http://127.0.0.1:${serverPort}`,
+      upload_token: "",
+      managed: {
+        server: { enabled: true, host: bindHost, port: serverPort },
+        dashboard: { enabled: true, host: dashboardHost, port: dashboardPort },
+      },
+    });
+  }
+
+  note("Self-hosted server", [
+    `Server bind: ${bindHost}:${serverPort}`,
+    `Server URL for clients on this network: http://${lanHost}:${serverPort}`,
+    `Dashboard: http://${lanHost}:${dashboardPort}`,
+  ]);
+  if (!opts.noOpen) openUrl(`http://127.0.0.1:${dashboardPort}`);
+  outro(includeClient ? "Runlight self-hosted server and client are ready." : "Runlight self-hosted server is ready.");
+  return { server, dashboard, daemon, plugins: target, serverUrl };
 }
 
 async function runHook(positional) {
@@ -449,6 +694,8 @@ export async function main(argv) {
   if (command === "setting" || command === "settings") return runSetting(positional);
   if (command === "plugin") return runPlugin(positional, opts);
   if (command === "daemon") return runDaemonCommand(positional);
+  if (command === "server") return runServerCommand(positional, opts);
+  if (command === "dashboard") return runDashboardCommand(positional, opts);
   if (command === "hook") return runHook(positional);
   if (command === "config-path") {
     await fs.mkdir(resolvePaths().home, { recursive: true });

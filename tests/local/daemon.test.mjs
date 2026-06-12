@@ -97,6 +97,54 @@ describe("local daemon", () => {
     assert.equal(received[0].body.events[0].session_id, "sess-daemon");
   });
 
+  it("flushes local-only events without requiring an upload token", async () => {
+    const received = [];
+    const remote = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+      });
+      req.on("end", () => {
+        received.push({
+          url: req.url,
+          auth: req.headers.authorization,
+          body: JSON.parse(raw),
+        });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ events: [{ event_id: "evt-local", session_id: "sess-local", status: "running" }] }));
+      });
+    });
+    const remoteAddress = await listen(remote);
+    servers.push(() => closeServer(remote));
+
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const config = defaultConfig(env);
+    config.server_url = `http://127.0.0.1:${remoteAddress.port}`;
+    config.upload_token = "";
+    config.daemon.port = 0;
+    await saveConfig(config, env);
+
+    const daemon = await createDaemonServer({ env });
+    servers.push(() => daemon.close());
+
+    const response = await fetch(`http://127.0.0.1:${daemon.server.address().port}/events`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify({ ...testEvent(), session_id: "sess-local" }),
+    });
+    assert.equal(response.status, 202);
+
+    await daemon.flush();
+    assert.equal(received.length, 1);
+    assert.equal(received[0].url, "/api/events");
+    assert.equal(received[0].auth, undefined);
+    assert.equal(received[0].body.events[0].session_id, "sess-local");
+  });
+
   it("keeps pending events and stays reachable when remote upload fails", async () => {
     const home = await tempHome();
     const env = { ...process.env, RUNLIGHT_HOME: home };

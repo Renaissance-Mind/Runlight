@@ -3,45 +3,37 @@
 Runlight has three independently deployable pieces:
 
 - Agent Client: Codex, Claude Code, Python, or other adapters that emit events.
-- Server: FastAPI storage and query service.
-- Dashboard: React/Tauri UI that queries the server with the same optional token model.
+- Server: embedded local server, FastAPI storage service, or Cloudflare Worker.
+- Dashboard: embedded static dashboard, React/Tauri UI, or hosted Worker assets.
 
 The connection contract is the same for all deployments:
 
 ```json
 {
-  "server_url": "http://<server-host>:8766",
+  "server_url": "http://<server-host>:18765",
   "token": ""
 }
 ```
 
-An empty token maps to the server's `default` user. A non-empty token maps to a
-user through `RUNLIGHT_TOKEN_MAP`.
+An empty token maps to the server's `default` user on local/self-hosted
+embedded servers. A non-empty token maps to the same hashed local user id on
+embedded servers, or to a configured user through `RUNLIGHT_TOKEN_MAP` on the
+FastAPI server.
 
 ## Local Single-User
 
 Use this when the agent client, server, and dashboard are all on the same
 machine.
 
-Start the server:
-
 ```bash
-cd /path/to/Runlight/server
-/Users/caopu/miniforge3/bin/python -m uvicorn runlight.app:app --host 127.0.0.1 --port 8766
+runlight setup --local
 ```
 
-Start the dashboard:
-
-```bash
-cd /path/to/Runlight/dashboard
-npm run dev -- --host 127.0.0.1 --port 3000
-```
-
-Use this client or dashboard connection:
+This starts the embedded local server, dashboard, and daemon. Defaults are:
 
 ```json
 {
-  "server_url": "http://127.0.0.1:8766",
+  "server_url": "http://127.0.0.1:18765",
   "token": ""
 }
 ```
@@ -51,25 +43,27 @@ Use this client or dashboard connection:
 Use this when agent clients or dashboards run on other machines in the same
 network.
 
-Start the server on the host machine:
+Start the server machine:
 
 ```bash
-cd /path/to/Runlight/server
-RUNLIGHT_TOKEN_MAP='tok-alice:alice,tok-bob:bob' \
-  /Users/caopu/miniforge3/bin/python -m uvicorn runlight.app:app --host 0.0.0.0 --port 8766
+runlight setup --self-hosted --role server
 ```
 
-Use the server machine's LAN IP from clients and dashboards:
+Connect client machines:
 
-```json
-{
-  "server_url": "http://<server-lan-ip>:8766",
-  "token": "tok-alice"
-}
+```bash
+runlight setup --self-hosted --role client --server <server-lan-ip>:18765
 ```
 
-The dashboard sends the token as `Authorization: Bearer <token>` on query
-requests. Agent clients send the same header on ingest requests.
+If you want the server machine to monitor itself too:
+
+```bash
+runlight setup --self-hosted --role both
+```
+
+The embedded server accepts empty credentials as the `default` user. If clients
+provide bearer tokens explicitly, the same token maps to the same hashed local
+user id.
 
 ## Remote Server
 
@@ -99,8 +93,7 @@ Install and configure the npm CLI once on each machine:
 
 ```bash
 npm install -g runlight
-runlight login --server http://127.0.0.1:8766 --token <upload-token>
-runlight daemon start
+runlight setup
 ```
 
 Use `runlight setting` for interactive configuration and `runlight status` or
@@ -142,7 +135,7 @@ but runtime connection settings are still owned by `runlight login` and
 The Python adapter uses environment variables:
 
 ```bash
-export RUNLIGHT_SERVER_URL=http://127.0.0.1:8766
+export RUNLIGHT_SERVER_URL=http://127.0.0.1:18765
 export RUNLIGHT_TOKEN=
 ```
 

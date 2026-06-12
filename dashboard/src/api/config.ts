@@ -15,7 +15,7 @@ const LEGACY_DASHBOARD_CONFIG_STORAGE_KEY = "agent-monitor.dashboard.connection"
 
 function normalizeServerUrl(serverUrl: string): string {
   const trimmed = serverUrl.trim();
-  if (!trimmed) return "http://127.0.0.1:8766";
+  if (!trimmed) return "http://127.0.0.1:18765";
   const withoutTrailingSlash = trimmed.replace(/\/+$/, "");
 
   try {
@@ -52,10 +52,10 @@ function importMetaEnv(): DashboardConfigEnv {
 }
 
 function defaultServerUrl(): string {
-  if (typeof window === "undefined") return "http://127.0.0.1:8766";
+  if (typeof window === "undefined") return "http://127.0.0.1:18765";
   const origin = window.location.origin;
   if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/.test(origin)) {
-    return "http://127.0.0.1:8766";
+    return "http://127.0.0.1:18765";
   }
   return origin;
 }

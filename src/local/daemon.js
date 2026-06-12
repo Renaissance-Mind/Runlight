@@ -122,27 +122,24 @@ export async function flushPending({ config, paths, fetchImpl = fetch } = {}) {
   if (pending === 0) {
     return writeState(paths, { upload_status: "idle", pending_count: 0 });
   }
-  if (!config.upload_token) {
-    return writeState(paths, {
-      upload_status: "blocked",
-      upload_error: "Upload token is not configured",
-      pending_count: pending,
-    });
-  }
 
   const batch = await readPendingBatch(paths);
   if (batch.events.length === 0) {
     return writeState(paths, { upload_status: "idle", pending_count: pending });
   }
 
+  const headers = {
+    "content-type": "application/json",
+  };
+  if (config.upload_token) {
+    headers.authorization = `Bearer ${config.upload_token}`;
+  }
+
   let response;
   try {
     response = await fetchImpl(`${config.server_url}/api/events`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${config.upload_token}`,
-      },
+      headers,
       body: JSON.stringify({ events: batch.events }),
     });
   } catch (error) {
@@ -330,8 +327,9 @@ export async function queryDaemon(pathname, { method = "GET", body, env = proces
 
 export async function startDaemon({ env = process.env } = {}) {
   const config = await loadOrCreateConfig(env);
+  const daemonUrl = localDaemonUrl(config);
   try {
-    const health = await fetch(`${localDaemonUrl(config)}/health`);
+    const health = await fetch(`${daemonUrl}/health`);
     if (health.ok) return { started: false, alreadyRunning: true };
   } catch {
     // The daemon is not reachable yet; continue with a background start.
@@ -348,7 +346,19 @@ export async function startDaemon({ env = process.env } = {}) {
     stdio: ["ignore", out, err],
   });
   child.unref();
-  return { started: true, pid: child.pid };
+  const deadline = Date.now() + 5_000;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      const health = await fetch(`${daemonUrl}/health`);
+      if (health.ok) return { started: true, pid: child.pid };
+      lastError = new Error(`HTTP ${health.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for Runlight daemon: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
 export async function stopDaemon({ env = process.env } = {}) {

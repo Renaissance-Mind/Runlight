@@ -15,7 +15,7 @@ describe("dashboard server connection config", () => {
     const config = resolveDashboardConfig({});
 
     assert.deepEqual(config, {
-      serverUrl: "http://127.0.0.1:8766",
+      serverUrl: "http://127.0.0.1:18765",
       token: "",
     });
   });

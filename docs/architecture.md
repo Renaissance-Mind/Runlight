@@ -74,25 +74,26 @@ For personal use or small teams. Zero-config single-user by default.
 └─────────────┘     └─────────────────────────────┘
 ```
 
-**Authentication**: Token-based. Token can be empty (single-user, no auth).
+**Authentication**: Local mode can run without login or visible tokens. A bearer
+token, when provided explicitly, maps to a stable local user id.
 
 | Component | How to Run |
 |---|---|
-| Server + Dashboard | Run FastAPI with `uvicorn`; run dashboard with Vite |
+| Server + Dashboard | `runlight setup --local` or `runlight setup --self-hosted --role server` |
 | Menubar | Standalone desktop app, connect to local server |
-| Client | Install plugin, configure URL + token |
+| Client | `runlight setup --self-hosted --role client --server <host>:18765` |
 
 **Client configuration**:
 
 ```json
 {
-  "server_url": "http://127.0.0.1:8766",
+  "server_url": "http://127.0.0.1:18765",
   "token": ""
 }
 ```
 
-- `server_url`: Required. Points to the self-hosted server.
-- `token`: Optional. Empty = single-user `default` account. Non-empty = looked up in `TOKEN_MAP`.
+- `server_url`: Required. Points to the configured server.
+- `token`: Optional and normally implicit. Empty = single-user `default` account for local/self-hosted embedded use.
 
 **Server configuration** (multi-user):
 
@@ -163,8 +164,8 @@ Configuration **differs** by deployment mode:
 
 | | Self-Hosted | Cloud-Hosted |
 |---|---|---|
-| `server_url` | User sets (default `http://127.0.0.1:8766`) | Built-in, no config needed |
-| `token` | Optional (empty = no auth) | OAuth login or paste token |
+| `server_url` | User sets (default `http://127.0.0.1:18765`) | Built-in, no config needed |
+| `token` | Optional/implicit (empty = no auth for local) | Browser login handoff |
 
 ---
 

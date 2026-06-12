@@ -134,6 +134,7 @@ export function redactConfig(config) {
     token_configured: Boolean(config.upload_token),
     token_preview: config.upload_token ? `${config.upload_token.slice(0, 10)}...${config.upload_token.slice(-4)}` : "",
     daemon: config.daemon,
+    managed: config.managed || {},
     machine_id: config.machine_id,
   };
 }

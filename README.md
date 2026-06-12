@@ -43,6 +43,7 @@ custom clients.
 - Live session status inference from real events and heartbeats
 - Project-grouped dashboard with session pins, branches, machines, and paths
 - Message-style run feed plus per-session event timelines
+- Embedded local server and static dashboard for single-machine use
 - Local FastAPI server with SQLite by default and PostgreSQL support
 - Cloudflare Worker backend with D1 storage and the same API contract
 - Token-to-user mapping for small teams or hosted deployments
@@ -56,7 +57,9 @@ flowchart LR
   subgraph Local
     Codex["Codex hook"]
     Claude["Claude Code hook"]
-    Daemon["Runlight local daemon<br/>127.0.0.1:18766"]
+    Daemon["Runlight local daemon<br/>127.0.0.1:18767"]
+    LocalServer["Embedded local server<br/>127.0.0.1:18765"]
+    LocalDashboard["Embedded dashboard<br/>127.0.0.1:18766"]
     Python["Python / CLI adapter"]
     Custom["Custom adapter"]
   end
@@ -73,6 +76,8 @@ flowchart LR
 
   Codex -->|"runlight hook codex"| Daemon
   Claude -->|"runlight hook claude"| Daemon
+  Daemon -->|"local mode"| LocalServer
+  LocalDashboard --> LocalServer
   Daemon -->|"POST /api/events"| Servers
   Python -->|"POST /api/events"| Servers
   Custom -->|"POST /api/events"| Servers
@@ -127,10 +132,25 @@ npm install -g .
 runlight setup
 ```
 
-The setup flow opens a browser connect page, signs you in, creates an upload
-token automatically, returns it to the CLI through a short-lived browser
-handoff, starts the local daemon, installs Codex and Claude hooks, and keeps
-future events flowing through the daemon.
+The setup flow asks which mode you want:
+
+- **Runlight Cloud** opens a browser login page, signs you in, returns the
+  upload credential to the CLI automatically, starts the daemon, and installs
+  Codex and Claude hooks.
+- **Local only** starts an embedded local server, dashboard, and daemon on this
+  machine. It does not require an account or a visible token.
+- **Self-hosted** lets this machine run the server, act as a client for another
+  server, or do both. Client machines only need the server address.
+
+Non-interactive setup is also available:
+
+```bash
+runlight setup --cloud
+runlight setup --local
+runlight setup --self-hosted --role server
+runlight setup --self-hosted --role client --server 192.168.1.20:18765
+runlight setup --self-hosted --role both
+```
 
 Codex will ask you to review the new hooks the next time you start a Codex
 session. Choose **Trust all and continue** once; after that Runlight runs in the
@@ -158,9 +178,10 @@ runlight logout
 Logout removes the local upload token, uninstalls Codex and Claude hooks, and
 stops the local daemon. Run `runlight setup` again to reconnect.
 
-### Local development server
+### Local Development Server
 
-To run the FastAPI server and React dashboard from source:
+`runlight setup --local` is the normal local-only path. To run the FastAPI
+server and React dashboard from source for development:
 
 ```bash
 cd server
@@ -174,7 +195,7 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
-Point the daemon at the local server with `runlight setting` or
+Point the daemon at the source server with `runlight setting` or
 `runlight login --server http://127.0.0.1:8766 --token <token>`.
 
 ## Agent Integrations
@@ -253,30 +274,44 @@ runlight-adapter finish --session demo-1 --result completed --summary "Done"
 Configure the adapter with environment variables:
 
 ```bash
-export RUNLIGHT_SERVER_URL=http://127.0.0.1:8766
+export RUNLIGHT_SERVER_URL=http://127.0.0.1:18765
 export RUNLIGHT_TOKEN=
 ```
 
 ## Deployment
 
-### Local or LAN self-hosting
+### Local or LAN Self-Hosting
 
-The FastAPI server uses SQLite by default:
+The npm CLI can run an embedded server and dashboard without Python:
+
+```bash
+runlight setup --local
+runlight setup --self-hosted --role server
+runlight setup --self-hosted --role client --server <server-host>:18765
+runlight setup --self-hosted --role both
+```
+
+The embedded server stores local data under `~/.runlight/local-server.json` and
+accepts empty credentials as the `default` user. If clients provide bearer
+tokens, the same token maps to the same hashed local user id.
+
+The FastAPI server is still available for Python/PostgreSQL deployments. It uses
+SQLite by default:
 
 ```bash
 cd server
 python -m uvicorn runlight.app:app --host 127.0.0.1 --port 8766
 ```
 
-For LAN access or multi-user testing, bind to all interfaces and set a token
-map:
+For FastAPI LAN access or multi-user testing, bind to all interfaces and set a
+token map:
 
 ```bash
 RUNLIGHT_TOKEN_MAP='tok-alice:alice,tok-bob:bob' \
 python -m uvicorn runlight.app:app --host 0.0.0.0 --port 8766
 ```
 
-Clients and viewers then use the same connection shape:
+FastAPI clients and viewers then use the same connection shape:
 
 ```json
 {
@@ -352,7 +387,7 @@ All clients and viewers use the same REST API:
 Single-event ingest example:
 
 ```bash
-curl -X POST http://127.0.0.1:8766/api/events \
+curl -X POST http://127.0.0.1:18765/api/events \
   -H "Content-Type: application/json" \
   -d '{
     "session_id": "demo-1",
@@ -374,9 +409,10 @@ Standard event types include `session.started`, `session.heartbeat`,
 Server environment variables use the `RUNLIGHT_` prefix.
 
 Local CLI configuration lives in `~/.runlight/config.json` unless
-`RUNLIGHT_HOME` is set. The local daemon listens on `127.0.0.1:18766` by
-default, stores queued hook events under `~/.runlight/queue`, and uploads them
-with the dashboard-generated upload token saved by `runlight login`.
+`RUNLIGHT_HOME` is set. Defaults are `127.0.0.1:18765` for the embedded local
+server, `127.0.0.1:18766` for the embedded dashboard, and `127.0.0.1:18767` for
+the local daemon. The daemon stores queued hook events under
+`~/.runlight/queue` and uploads them to the configured server.
 
 Useful local commands:
 
@@ -388,6 +424,8 @@ runlight setting
 runlight status
 runlight health
 runlight daemon start
+runlight server start
+runlight dashboard start
 runlight plugin codex
 runlight plugin claude
 ```
@@ -485,7 +523,8 @@ swift run RunlightBar
   update.
 - Codex and Claude hooks are fail-open and only call the local daemon. The
   daemon owns token storage, event enrichment, queueing, retry, and upload.
-- Do not expose the self-hosted server without TLS and an explicit token map.
+- Do not expose the self-hosted server to untrusted networks without TLS and an
+  explicit auth boundary.
 - No license file is currently present in this repository.
 
 ## Contributing
