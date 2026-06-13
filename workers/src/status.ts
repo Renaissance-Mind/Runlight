@@ -4,6 +4,31 @@ export const TERMINAL_EVENT_TYPES = new Set([
   "session.aborted",
 ]);
 
+export const RUNNING_STATUSES = new Set([
+  "starting",
+  "running",
+  "tool_running",
+  "command_running",
+  "waiting_user",
+  "waiting_external",
+]);
+
+export function isRunningStatus(status: string | null | undefined): boolean {
+  return Boolean(status && RUNNING_STATUSES.has(status));
+}
+
+export function nextCurrentRunStartedAt(
+  nextStatus: string,
+  previousStatus: string | null | undefined,
+  eventTime: string,
+  currentValue: string | null = null,
+): string | null {
+  if (isRunningStatus(nextStatus) && !isRunningStatus(previousStatus)) {
+    return eventTime;
+  }
+  return currentValue;
+}
+
 export function nextTerminalResult(latestEventType: string): string | null {
   if (latestEventType === "session.completed") return "completed";
   if (latestEventType === "session.failed") return "failed";

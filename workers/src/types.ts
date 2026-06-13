@@ -39,6 +39,7 @@ export interface SessionRow {
   started_at: string;
   last_event_at: string | null;
   last_heartbeat_at: string | null;
+  current_run_started_at: string | null;
   event_count: number;
   terminal_result: string | null;
   created_at: string;

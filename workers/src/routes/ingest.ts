@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env, EventEnvelope, EventBatch } from "../types";
 import { resolveRequestUser } from "../auth";
-import { inferStatus, nextTerminalResult } from "../status";
+import { inferStatus, nextCurrentRunStartedAt, nextTerminalResult } from "../status";
 
 export const ingest = new Hono<{ Bindings: Env }>();
 
@@ -104,6 +104,12 @@ async function upsertSession(
       envelope.event_time,
       staleSec,
     );
+    const currentRunStartedAt = nextCurrentRunStartedAt(
+      status,
+      "starting",
+      envelope.event_time,
+      null,
+    );
 
     await db
       .prepare(
@@ -112,8 +118,8 @@ async function upsertSession(
           machine_hostname, machine_os, machine_arch, machine_user, machine_id,
           workspace_cwd, workspace_repo_root, workspace_git_branch, workspace_git_commit, workspace_project_name,
           current_status, latest_event_type, started_at, last_event_at, last_heartbeat_at,
-          event_count, terminal_result, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          event_count, terminal_result, current_run_started_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         envelope.session_id,
@@ -142,6 +148,7 @@ async function upsertSession(
         envelope.event_type === "session.heartbeat" ? envelope.event_time : null,
         1,
         terminalResult,
+        currentRunStartedAt,
         now,
       )
       .run();
@@ -217,6 +224,17 @@ async function upsertSession(
   );
   updates.push("current_status = ?");
   params.push(status);
+
+  const nextRunStartedAt = nextCurrentRunStartedAt(
+    status,
+    existing.current_status as string | null,
+    envelope.event_time,
+    existing.current_run_started_at as string | null,
+  );
+  if (nextRunStartedAt !== (existing.current_run_started_at as string | null)) {
+    updates.push("current_run_started_at = ?");
+    params.push(nextRunStartedAt);
+  }
 
   params.push(envelope.session_id);
 

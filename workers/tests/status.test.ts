@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { inferStatus, nextTerminalResult } from "../src/status.ts";
+import {
+  inferStatus,
+  isRunningStatus,
+  nextCurrentRunStartedAt,
+  nextTerminalResult,
+} from "../src/status.ts";
 
 function secondsAgo(seconds: number): string {
   return new Date(Date.now() - seconds * 1000).toISOString();
@@ -28,5 +33,22 @@ describe("worker status inference", () => {
     assert.equal(nextTerminalResult("message.started"), null);
     assert.equal(nextTerminalResult("session.heartbeat"), null);
     assert.equal(nextTerminalResult("session.completed"), "completed");
+  });
+
+  it("tracks the start time when a session re-enters a running status", () => {
+    assert.equal(isRunningStatus("running"), true);
+    assert.equal(isRunningStatus("finished"), false);
+    assert.equal(
+      nextCurrentRunStartedAt("running", "finished", "2026-06-13T19:10:00.000Z", "old"),
+      "2026-06-13T19:10:00.000Z",
+    );
+    assert.equal(
+      nextCurrentRunStartedAt("running", "starting", "2026-06-13T19:10:00.000Z", null),
+      null,
+    );
+    assert.equal(
+      nextCurrentRunStartedAt("finished", "running", "2026-06-13T19:10:00.000Z", "old"),
+      "old",
+    );
   });
 });

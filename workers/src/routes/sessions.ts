@@ -40,6 +40,7 @@ function sessionToJson(row: SessionRow) {
     started_at: row.started_at,
     last_event_at: row.last_event_at,
     last_heartbeat_at: row.last_heartbeat_at,
+    current_run_started_at: row.current_run_started_at ?? null,
     event_count: row.event_count,
     terminal_result: row.terminal_result,
   };
