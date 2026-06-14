@@ -28,15 +28,15 @@ const STATUS_PRESENTATIONS: Record<StatusTone, StatusPresentation> = {
   running: {
     tone: "running",
     label: "Running",
-    dotClass: "bg-accent-green",
-    textClass: "text-accent-green",
+    dotClass: "bg-accent-orange",
+    textClass: "text-accent-orange",
     pulse: true,
   },
   recent_finished: {
     tone: "recent_finished",
     label: "Finished <30m",
-    dotClass: "bg-accent-orange",
-    textClass: "text-accent-orange",
+    dotClass: "bg-accent-green",
+    textClass: "text-accent-green",
   },
   finished: {
     tone: "finished",

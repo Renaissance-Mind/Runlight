@@ -7,9 +7,14 @@ import {
 } from "../src/api/statusPresentation.ts";
 
 describe("dashboard status presentation", () => {
-  it("marks finished sessions from the last 30 minutes as orange", () => {
+  it("marks running sessions orange and recent finished sessions green", () => {
     const nowMs = Date.parse("2026-06-08T10:00:00Z");
 
+    assert.equal(
+      getStatusPresentation("running", "2026-06-08T09:59:00Z", nowMs)
+        .dotClass,
+      "bg-accent-orange",
+    );
     assert.equal(
       getStatusPresentation("finished", "2026-06-08T09:30:00Z", nowMs).tone,
       "recent_finished",
@@ -17,7 +22,7 @@ describe("dashboard status presentation", () => {
     assert.equal(
       getStatusPresentation("completed", "2026-06-08T09:45:00Z", nowMs)
         .dotClass,
-      "bg-accent-orange",
+      "bg-accent-green",
     );
     assert.equal(
       getStatusPresentation("finished", "2026-06-08T09:29:59Z", nowMs).tone,
