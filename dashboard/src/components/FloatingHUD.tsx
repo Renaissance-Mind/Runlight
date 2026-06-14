@@ -63,7 +63,7 @@ export default function FloatingHUD({ sessions }: Props) {
         )}
         <div className="min-w-0 flex-1">
           <div
-            className="flex items-center gap-4 text-xs"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs"
             aria-label="Session status counts"
           >
             {COUNTER_TONES.map((tone) => (
@@ -100,7 +100,7 @@ function HUDCounter({
 
   return (
     <div
-      className="flex items-center gap-1.5"
+      className="flex items-center gap-1.5 whitespace-nowrap"
       title={`${presentation.label}: ${count}`}
       aria-label={`${presentation.label}: ${count}`}
     >
@@ -109,6 +109,13 @@ function HUDCounter({
           count > 0 ? "" : "opacity-30"
         }`}
       />
+      <div
+        className={`text-[10px] font-semibold uppercase leading-none ${
+          count > 0 ? presentation.textClass : "text-gray-600"
+        }`}
+      >
+        {presentation.label}
+      </div>
       <div
         className={`text-lg font-bold leading-none tabular-nums ${
           count > 0 ? presentation.textClass : "text-gray-600"

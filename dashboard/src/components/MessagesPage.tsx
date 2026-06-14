@@ -94,9 +94,6 @@ function LiveRow({ session: s }: { session: Session }) {
           )}
           <span className="shrink-0 flex items-center"><AgentIcon agentType={s.agent_type} /></span>
           <span className="truncate text-sm text-white">{title}</span>
-          <span className={`shrink-0 text-[10px] ${presentation.textClass}`}>
-            {s.current_status}
-          </span>
         </div>
       </div>
     </Link>
