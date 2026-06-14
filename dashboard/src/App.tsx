@@ -22,6 +22,7 @@ import {
   readPreferences,
   writePreferences,
   getEffectiveTheme,
+  userSettingsFromPreferences,
   type DashboardPreferences,
 } from "./api/preferences";
 import type { Session } from "./types/session";
@@ -157,12 +158,10 @@ export default function App() {
     writeStoredDashboardConfig(next);
     setConfig(next);
   };
-  const savePrefs = (next: DashboardPreferences) => {
+  const savePrefs = async (next: DashboardPreferences) => {
     writePreferences(next);
     setPrefs(next);
-    saveUserSettings({ theme: next.theme, language: next.language }, config).catch(() => {
-      // Local preferences are already saved; the server can be retried later.
-    });
+    await saveUserSettings(userSettingsFromPreferences(next), config);
   };
 
   useEffect(() => {

@@ -19,6 +19,18 @@ const DEFAULTS: DashboardPreferences = {
   messageMaxColumns: 3,
 };
 
+function normalizeTheme(value: unknown): Theme {
+  return value === "dark" || value === "light" || value === "system"
+    ? value
+    : DEFAULTS.theme;
+}
+
+function normalizeLanguage(value: unknown): Language {
+  return value === "system" || value === "en" || value === "zh-CN"
+    ? value
+    : DEFAULTS.language;
+}
+
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   const parsed = Math.floor(Number(value));
   if (!Number.isFinite(parsed)) return fallback;
@@ -31,6 +43,8 @@ export function normalizePreferences(
   return {
     ...DEFAULTS,
     ...partial,
+    theme: normalizeTheme(partial.theme),
+    language: normalizeLanguage(partial.language),
     hideStaleAfterHours: Math.max(
       0,
       Number(partial.hideStaleAfterHours ?? DEFAULTS.hideStaleAfterHours),
@@ -60,6 +74,16 @@ export function readPreferences(): DashboardPreferences {
 
 export function writePreferences(prefs: DashboardPreferences): void {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizePreferences(prefs)));
+}
+
+export function userSettingsFromPreferences(
+  prefs: DashboardPreferences,
+): Pick<DashboardPreferences, "theme" | "language"> {
+  const normalized = normalizePreferences(prefs);
+  return {
+    theme: normalized.theme,
+    language: normalized.language,
+  };
 }
 
 export function getEffectiveTheme(theme: Theme): "dark" | "light" {

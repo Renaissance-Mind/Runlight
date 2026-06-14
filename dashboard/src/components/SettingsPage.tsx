@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { DashboardConnectionConfig } from "../api/config";
 import {
@@ -13,7 +13,13 @@ import {
   formatConnectionStatus,
   normalizeSettingsDraft,
 } from "../api/settingsModel";
-import { getEffectiveTheme, type DashboardPreferences, type Language, type Theme } from "../api/preferences";
+import {
+  getEffectiveTheme,
+  normalizePreferences,
+  type DashboardPreferences,
+  type Language,
+  type Theme,
+} from "../api/preferences";
 
 function statusToneClass(tone: "ok" | "muted" | "error"): string {
   switch (tone) {
@@ -37,17 +43,28 @@ export default function SettingsPage({
   probe: ServerConnectionProbe | null;
   prefs: DashboardPreferences;
   onSave: (config: DashboardConnectionConfig) => void;
-  onSavePrefs: (prefs: DashboardPreferences) => void;
+  onSavePrefs: (prefs: DashboardPreferences) => Promise<void> | void;
 }) {
   const [draft, setDraft] = useState(config);
   const [prefsDraft, setPrefsDraft] = useState(prefs);
   const [saved, setSaved] = useState(false);
+  const [prefsStatus, setPrefsStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [prefsError, setPrefsError] = useState<string | null>(null);
   const [uploadTokens, setUploadTokens] = useState<UploadTokenRecord[]>([]);
   const [createdToken, setCreatedToken] = useState<CreatedUploadToken | null>(null);
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const status = formatConnectionStatus(probe);
+  const prefsSaveChain = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    setDraft(config);
+  }, [config.serverUrl, config.token]);
+
+  useEffect(() => {
+    setPrefsDraft(prefs);
+  }, [prefs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,8 +88,31 @@ export default function SettingsPage({
     const next = normalizeSettingsDraft(draft);
     setDraft(next);
     onSave(next);
-    onSavePrefs(prefsDraft);
     setSaved(true);
+  };
+
+  const savePrefsDraft = (nextDraft: DashboardPreferences) => {
+    const next = normalizePreferences(nextDraft);
+    setPrefsDraft(next);
+    setSaved(false);
+    setPrefsStatus("saving");
+    setPrefsError(null);
+
+    const run = prefsSaveChain.current
+      .catch(() => undefined)
+      .then(() => Promise.resolve(onSavePrefs(next)));
+    prefsSaveChain.current = run;
+
+    run
+      .then(() => {
+        if (prefsSaveChain.current !== run) return;
+        setPrefsStatus("saved");
+      })
+      .catch((error) => {
+        if (prefsSaveChain.current !== run) return;
+        setPrefsStatus("idle");
+        setPrefsError(error instanceof Error ? error.message : String(error));
+      });
   };
 
   const generateUploadToken = async () => {
@@ -262,8 +302,7 @@ export default function SettingsPage({
               value={prefsDraft.theme}
               onChange={(e) => {
                 const next = e.currentTarget.value as Theme;
-                setSaved(false);
-                setPrefsDraft({ ...prefsDraft, theme: next });
+                savePrefsDraft({ ...prefsDraft, theme: next });
                 document.documentElement.classList.toggle("dark", getEffectiveTheme(next) === "dark");
               }}
               className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm"
@@ -282,8 +321,7 @@ export default function SettingsPage({
               value={prefsDraft.language}
               onChange={(e) => {
                 const next = e.currentTarget.value as Language;
-                setSaved(false);
-                setPrefsDraft({ ...prefsDraft, language: next });
+                savePrefsDraft({ ...prefsDraft, language: next });
               }}
               className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm"
             >
@@ -303,8 +341,7 @@ export default function SettingsPage({
               step="1"
               value={prefsDraft.hideStaleAfterHours}
               onChange={(e) => {
-                setSaved(false);
-                setPrefsDraft({ ...prefsDraft, hideStaleAfterHours: Math.max(0, Number(e.currentTarget.value)) });
+                savePrefsDraft({ ...prefsDraft, hideStaleAfterHours: Math.max(0, Number(e.currentTarget.value)) });
               }}
               className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm text-gray-200"
             />
@@ -320,8 +357,7 @@ export default function SettingsPage({
               step="1"
               value={prefsDraft.hideFinishedAfterHours}
               onChange={(e) => {
-                setSaved(false);
-                setPrefsDraft({ ...prefsDraft, hideFinishedAfterHours: Math.max(0, Number(e.currentTarget.value)) });
+                savePrefsDraft({ ...prefsDraft, hideFinishedAfterHours: Math.max(0, Number(e.currentTarget.value)) });
               }}
               className="w-full bg-surface-2 border border-surface-3 rounded px-3 py-2 text-sm text-gray-200"
             />
@@ -338,8 +374,7 @@ export default function SettingsPage({
               step="1"
               value={prefsDraft.messageMaxColumns}
               onChange={(e) => {
-                setSaved(false);
-                setPrefsDraft({
+                savePrefsDraft({
                   ...prefsDraft,
                   messageMaxColumns: Math.min(
                     6,
@@ -352,7 +387,13 @@ export default function SettingsPage({
           </label>
 
           <p className="text-[10px] text-gray-600">
-            Set to 0 to never hide. Pinned sessions are always shown.
+            {prefsError
+              ? `Saved locally. Account sync failed: ${prefsError}`
+              : prefsStatus === "saving"
+                ? "Saving to account..."
+                : prefsStatus === "saved"
+                  ? "Saved to account"
+                  : "Set to 0 to never hide. Pinned sessions are always shown."}
           </p>
         </div>
       </main>
