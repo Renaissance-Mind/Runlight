@@ -299,6 +299,18 @@ async function runHealth(opts) {
   return payload;
 }
 
+function formatAgeSeconds(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return null;
+  if (value < 60) return `${Math.round(value)}s`;
+  const minutes = Math.floor(value / 60);
+  const secs = Math.round(value % 60);
+  if (minutes < 60) return secs ? `${minutes}m ${secs}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
 async function runStatus(opts) {
   const config = await loadConfig();
   let daemon = null;
@@ -322,7 +334,17 @@ async function runStatus(opts) {
   if (config.managed?.dashboard?.enabled) {
     console.log(`Dashboard:    managed at http://${config.managed.dashboard.host}:${config.managed.dashboard.port}`);
   }
-  if (daemon.pending_count !== undefined) console.log(`Queue:        ${daemon.pending_count} pending`);
+  if (daemon.pending_count !== undefined) {
+    const age = formatAgeSeconds(daemon.queue?.queue_oldest_age_seconds);
+    console.log(`Queue:        ${daemon.pending_count} pending${age ? ` (oldest ${age})` : ""}`);
+  }
+  if (daemon.state?.upload_status) {
+    const parts = [daemon.state.upload_status];
+    if (daemon.state.last_upload_count !== undefined) parts.push(`last ${daemon.state.last_upload_count} event(s)`);
+    if (daemon.state.last_upload_duration_ms !== undefined) parts.push(`${daemon.state.last_upload_duration_ms}ms`);
+    console.log(`Upload:       ${parts.join(", ")}`);
+    if (daemon.state.upload_error) console.log(`Upload error: ${daemon.state.upload_error}`);
+  }
   console.log(`Codex hook:   ${plugins.codex.installed ? "installed" : "not installed"}`);
   console.log(`Claude hook:  ${plugins.claude.installed ? "installed" : "not installed"}`);
   return payload;

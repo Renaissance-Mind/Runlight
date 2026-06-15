@@ -4,9 +4,10 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import { createDaemonServer, queryDaemon } from "../../src/local/daemon.js";
+import { createDaemonServer, drainPending, enqueueEvents, queryDaemon } from "../../src/local/daemon.js";
 import { saveConfig } from "../../src/local/config.js";
 import { defaultConfig } from "../../src/local/config.js";
+import { resolvePaths } from "../../src/local/paths.js";
 
 const servers = [];
 
@@ -46,6 +47,14 @@ function testEvent() {
     severity: "info",
     summary: "started",
   };
+}
+
+function testEvents(count, prefix = "sess-daemon") {
+  return Array.from({ length: count }, (_value, index) => ({
+    ...testEvent(),
+    session_id: `${prefix}-${index}`,
+    event_time: new Date(Date.now() + index).toISOString(),
+  }));
 }
 
 describe("local daemon", () => {
@@ -95,6 +104,88 @@ describe("local daemon", () => {
     assert.equal(received[0].url, "/api/events");
     assert.equal(received[0].auth, "Bearer upload-token");
     assert.equal(received[0].body.events[0].session_id, "sess-daemon");
+  });
+
+  it("drains multiple upload batches in one flush", async () => {
+    const received = [];
+    const remote = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+      });
+      req.on("end", () => {
+        received.push(JSON.parse(raw).events.length);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ events: [] }));
+      });
+    });
+    const remoteAddress = await listen(remote);
+    servers.push(() => closeServer(remote));
+
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const config = defaultConfig(env);
+    config.server_url = `http://127.0.0.1:${remoteAddress.port}`;
+    config.upload_token = "upload-token";
+    await saveConfig(config, env);
+
+    const paths = resolvePaths(env);
+    await enqueueEvents(paths, testEvents(205, "sess-drain"));
+
+    const state = await drainPending({ config, paths });
+    assert.deepEqual(received, [200, 5]);
+    assert.equal(state.pending_count, 0);
+    assert.equal(state.last_flush_batch_count, 2);
+    assert.equal(state.last_flush_event_count, 205);
+  });
+
+  it("serializes manual and scheduled flushes through the same lock", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let calls = 0;
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const config = defaultConfig(env);
+    config.server_url = "http://runlight.test";
+    config.upload_token = "upload-token";
+    config.daemon.port = 0;
+    await saveConfig(config, env);
+
+    const daemon = await createDaemonServer({
+      env,
+      fetchImpl: async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        calls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        inFlight -= 1;
+        return new Response(JSON.stringify({ events: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    servers.push(() => daemon.close());
+
+    const eventResponse = await fetch(`http://127.0.0.1:${daemon.server.address().port}/events`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify(testEvent()),
+    });
+    assert.equal(eventResponse.status, 202);
+
+    const flushResponse = await fetch(`http://127.0.0.1:${daemon.server.address().port}/flush`, {
+      method: "POST",
+      headers: { "x-runlight-local-secret": config.local_secret },
+    });
+    assert.equal(flushResponse.status, 200);
+    const body = await flushResponse.json();
+    assert.equal(body.state.pending_count, 0);
+    assert.equal(maxInFlight, 1);
+    assert.equal(calls, 1);
   });
 
   it("flushes local-only events without requiring an upload token", async () => {
@@ -180,6 +271,9 @@ describe("local daemon", () => {
     const status = await statusResponse.json();
     assert.equal(status.status, "ok");
     assert.equal(status.pending_count, 1);
+    assert.equal(status.queue.pending_count, 1);
+    assert.ok(status.queue.queue_oldest_queued_at);
+    assert.ok(Number.isFinite(status.queue.queue_oldest_age_seconds));
     assert.equal(status.state.upload_status, "error");
     assert.match(status.state.upload_error, /network unavailable/);
   });

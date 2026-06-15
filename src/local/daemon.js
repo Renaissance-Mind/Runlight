@@ -8,7 +8,10 @@ import { loadConfig, loadOrCreateConfig, redactConfig } from "./config.js";
 import { enrichRawHookEvents } from "./enrich.js";
 import { ensureRuntimeDirs, localDaemonUrl, resolvePaths } from "./paths.js";
 
-const MAX_BATCH_EVENTS = 50;
+const MAX_BATCH_EVENTS = 200;
+const MAX_DRAIN_BATCHES = 25;
+const UPLOAD_ATTEMPTS = 2;
+const UPLOAD_RETRY_DELAY_MS = 750;
 
 function jsonResponse(res, statusCode, body) {
   const text = JSON.stringify(body);
@@ -70,10 +73,45 @@ async function writeState(paths, patch) {
   return next;
 }
 
-export async function countPending(paths) {
+function parseTimeMs(value) {
+  if (!value) return null;
+  const ms = new Date(String(value).endsWith("Z") ? value : `${value}Z`).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function pendingQueueStats(paths, nowMs = Date.now()) {
   await ensureRuntimeDirs(paths);
-  const files = await fs.readdir(paths.pending);
-  return files.filter((name) => name.endsWith(".json")).length;
+  const files = (await fs.readdir(paths.pending)).filter((name) => name.endsWith(".json")).sort();
+  const stats = {
+    pending_count: files.length,
+    queue_oldest_queued_at: null,
+    queue_oldest_event_at: null,
+    queue_oldest_age_seconds: null,
+  };
+  if (files.length === 0) return stats;
+
+  const payload = JSON.parse(await fs.readFile(path.join(paths.pending, files[0]), "utf8"));
+  const events = normalizeEvents(payload);
+  stats.queue_oldest_queued_at = payload.queued_at || null;
+  stats.queue_oldest_event_at = events[0]?.event_time || null;
+  const oldestMs = parseTimeMs(stats.queue_oldest_queued_at) ?? parseTimeMs(stats.queue_oldest_event_at);
+  if (oldestMs !== null) {
+    stats.queue_oldest_age_seconds = Math.max(0, Math.round((nowMs - oldestMs) / 1000));
+  }
+  return stats;
+}
+
+async function writeStateWithQueueStats(paths, patch) {
+  const stats = await pendingQueueStats(paths);
+  return writeState(paths, { ...stats, ...patch });
+}
+
+export async function countPending(paths) {
+  return (await pendingQueueStats(paths)).pending_count;
 }
 
 export async function enqueueEvents(paths, events) {
@@ -117,17 +155,7 @@ async function moveFailed(paths, files) {
   }
 }
 
-export async function flushPending({ config, paths, fetchImpl = fetch } = {}) {
-  const pending = await countPending(paths);
-  if (pending === 0) {
-    return writeState(paths, { upload_status: "idle", pending_count: 0 });
-  }
-
-  const batch = await readPendingBatch(paths);
-  if (batch.events.length === 0) {
-    return writeState(paths, { upload_status: "idle", pending_count: pending });
-  }
-
+async function uploadEventBatch({ config, events, fetchImpl }) {
   const headers = {
     "content-type": "application/json",
   };
@@ -135,39 +163,113 @@ export async function flushPending({ config, paths, fetchImpl = fetch } = {}) {
     headers.authorization = `Bearer ${config.upload_token}`;
   }
 
-  let response;
-  try {
-    response = await fetchImpl(`${config.server_url}/api/events`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ events: batch.events }),
-    });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return writeState(paths, {
-      upload_status: "error",
-      upload_error: `Upload failed: ${detail.slice(0, 240)}`,
-      pending_count: pending,
-    });
+  let lastError = "";
+  let lastDurationMs = 0;
+  for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt += 1) {
+    const startedAt = Date.now();
+    let response;
+    try {
+      response = await fetchImpl(`${config.server_url}/api/events`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ events }),
+      });
+    } catch (error) {
+      lastDurationMs = Date.now() - startedAt;
+      const detail = error instanceof Error ? error.message : String(error);
+      lastError = `Upload failed: ${detail.slice(0, 240)}`;
+      if (attempt < UPLOAD_ATTEMPTS) await sleep(UPLOAD_RETRY_DELAY_MS * attempt);
+      continue;
+    }
+
+    lastDurationMs = Date.now() - startedAt;
+    if (response.ok) {
+      return { ok: true, attempts: attempt, duration_ms: lastDurationMs };
+    }
+
+    const detail = await response.text();
+    lastError = `HTTP ${response.status}: ${detail.slice(0, 240)}`;
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt >= UPLOAD_ATTEMPTS) {
+      return { ok: false, attempts: attempt, duration_ms: lastDurationMs, error: lastError };
+    }
+    await sleep(UPLOAD_RETRY_DELAY_MS * attempt);
   }
 
-  if (!response.ok) {
-    const detail = await response.text();
-    return writeState(paths, {
+  return { ok: false, attempts: UPLOAD_ATTEMPTS, duration_ms: lastDurationMs, error: lastError };
+}
+
+export async function flushPending({ config, paths, fetchImpl = fetch } = {}) {
+  const pending = await countPending(paths);
+  if (pending === 0) {
+    return writeStateWithQueueStats(paths, { upload_status: "idle", pending_count: 0 });
+  }
+
+  const batch = await readPendingBatch(paths);
+  if (batch.events.length === 0) {
+    return writeStateWithQueueStats(paths, { upload_status: "idle", pending_count: pending });
+  }
+
+  await writeStateWithQueueStats(paths, {
+    upload_status: "uploading",
+    upload_error: "",
+    upload_started_at: new Date().toISOString(),
+    upload_batch_count: batch.events.length,
+  });
+
+  const upload = await uploadEventBatch({ config, events: batch.events, fetchImpl });
+  if (!upload.ok) {
+    return writeStateWithQueueStats(paths, {
       upload_status: "error",
-      upload_error: `HTTP ${response.status}: ${detail.slice(0, 240)}`,
+      upload_error: upload.error || "Upload failed",
+      last_upload_duration_ms: upload.duration_ms,
+      last_upload_attempts: upload.attempts,
       pending_count: pending,
     });
   }
 
   for (const file of batch.files) await fs.unlink(file);
   const nextPending = await countPending(paths);
-  return writeState(paths, {
+  return writeStateWithQueueStats(paths, {
     upload_status: "ok",
     upload_error: "",
     last_upload_at: new Date().toISOString(),
     last_upload_count: batch.events.length,
+    last_upload_duration_ms: upload.duration_ms,
+    last_upload_attempts: upload.attempts,
     pending_count: nextPending,
+  });
+}
+
+export async function drainPending({ config, paths, fetchImpl = fetch, maxBatches = MAX_DRAIN_BATCHES } = {}) {
+  let batches = 0;
+  let events = 0;
+  let state = await writeStateWithQueueStats(paths, {
+    flush_started_at: new Date().toISOString(),
+  });
+
+  if ((await countPending(paths)) === 0) {
+    return writeStateWithQueueStats(paths, {
+      upload_status: "idle",
+      flush_finished_at: new Date().toISOString(),
+      last_flush_batch_count: 0,
+      last_flush_event_count: 0,
+    });
+  }
+
+  while (batches < maxBatches) {
+    if ((await countPending(paths)) === 0) break;
+    state = await flushPending({ config, paths, fetchImpl });
+    if (state.upload_status !== "ok") break;
+    batches += 1;
+    events += Number(state.last_upload_count || 0);
+  }
+
+  return writeStateWithQueueStats(paths, {
+    upload_status: state.upload_status === "ok" && state.pending_count === 0 ? "idle" : state.upload_status,
+    flush_finished_at: new Date().toISOString(),
+    last_flush_batch_count: batches,
+    last_flush_event_count: events,
   });
 }
 
@@ -191,15 +293,19 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
       return flushPromise;
     }
     flushPromise = (async () => {
+      let finalState = null;
       try {
         do {
           flushRequested = false;
           const freshConfig = await loadConfig(env);
-          await flushPending({ config: freshConfig, paths, fetchImpl });
+          const state = await drainPending({ config: freshConfig, paths, fetchImpl });
+          finalState = state;
+          if (state.upload_status === "error") break;
         } while (flushRequested);
       } finally {
         flushPromise = null;
       }
+      return finalState;
     })();
     return flushPromise;
   }
@@ -219,11 +325,13 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
 
     if (req.method === "GET" && url.pathname === "/status") {
       const state = await readState(paths);
+      const queue = await pendingQueueStats(paths);
       jsonResponse(res, 200, {
         status: "ok",
         service: "runlight-daemon",
         config: redactConfig(freshConfig),
-        pending_count: await countPending(paths),
+        pending_count: queue.pending_count,
+        queue,
         state,
       });
       return;
@@ -253,7 +361,7 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
     }
 
     if (req.method === "POST" && url.pathname === "/flush") {
-      const state = await flushPending({ config: freshConfig, paths, fetchImpl });
+      const state = await scheduleFlush();
       jsonResponse(res, 200, { status: "ok", state });
       return;
     }
