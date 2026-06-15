@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, NavLink, Routes, Route } from "react-router-dom";
+import { Link, NavLink, Routes, Route, useLocation } from "react-router-dom";
 import { useLiveSessions } from "./hooks/useSessions";
 import { useServerConnection } from "./hooks/useServerConnection";
+import HomePage from "./components/HomePage";
 import SessionsTable from "./components/SessionsTable";
 import SessionDetail from "./components/SessionDetail";
 import FloatingHUD from "./components/FloatingHUD";
@@ -27,12 +28,95 @@ import {
 } from "./api/preferences";
 import type { Session } from "./types/session";
 
-function navLinkClass({ isActive }: { isActive: boolean }): string {
+function dashboardNavLinkClass({ isActive }: { isActive: boolean }): string {
   return `text-xs px-2 py-1 rounded transition-colors ${
     isActive
       ? "text-white bg-surface-2"
       : "text-gray-500 hover:text-white hover:bg-surface-2"
   }`;
+}
+
+function homeNavLinkClass({ isActive }: { isActive: boolean }): string {
+  return `text-sm font-semibold transition-colors ${
+    isActive ? "text-[#087e63]" : "text-[#0f172a] hover:text-[#087e63]"
+  }`;
+}
+
+function LogoMark({ home }: { home: boolean }) {
+  return (
+    <span
+      className={`inline-flex h-7 w-7 items-center justify-center rounded border ${
+        home
+          ? "border-[#0f9f7a]/40 bg-[#e9fbf5] text-[#087e63]"
+          : "border-surface-3 bg-surface-2 text-accent-green"
+      }`}
+    >
+      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+        <rect x="3" y="4.5" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8 20h8M12 16.5V20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M7.2 10.5h2.4l1.3-2.6 2.1 5.2 1.2-2.6h2.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
+function AppHeader({ home }: { home: boolean }) {
+  if (home) {
+    return (
+      <header className="sticky top-0 z-20 border-b border-[#d7e0ea] bg-[#f8fafc]/95 px-5 py-3 font-sans backdrop-blur sm:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2 text-xl font-black tracking-normal text-[#0f172a]">
+            <LogoMark home />
+            Runlight
+          </Link>
+          <nav className="hidden items-center gap-8 sm:flex">
+            <NavLink to="/live" className={homeNavLinkClass}>
+              Live
+            </NavLink>
+            <a href="/#devices" className="text-sm font-semibold text-[#0f172a] transition-colors hover:text-[#087e63]">
+              Devices
+            </a>
+            <NavLink to="/connect" className={homeNavLinkClass}>
+              Connect
+            </NavLink>
+            <a href="https://github.com/Renaissance-Mind/Runlight#readme" className="text-sm font-semibold text-[#0f172a] transition-colors hover:text-[#087e63]">
+              Docs
+            </a>
+          </nav>
+          <Link
+            to="/live"
+            className="hidden h-9 items-center rounded-md bg-[#087e63] px-4 text-sm font-bold text-[#f8fafc] transition-colors hover:bg-[#066b54] sm:inline-flex"
+          >
+            Open Dashboard
+          </Link>
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-2 text-sm font-bold text-white tracking-tight">
+          <LogoMark home={false} />
+          Runlight
+        </Link>
+        <nav className="flex items-center gap-1">
+          <NavLink to="/live" className={dashboardNavLinkClass}>
+            Live
+          </NavLink>
+          <NavLink to="/messages" className={dashboardNavLinkClass}>
+            Messages
+          </NavLink>
+        </nav>
+      </div>
+      <div className="flex items-center gap-3">
+        <NavLink to="/connect" className={dashboardNavLinkClass}>
+          Connect
+        </NavLink>
+      </div>
+    </header>
+  );
 }
 
 function ConnectionStatus({ probe }: { probe: ServerConnectionProbe | null }) {
@@ -147,6 +231,7 @@ function LoginScreen({
 }
 
 export default function App() {
+  const location = useLocation();
   const [config, setConfig] = useState(() =>
     resolveDashboardConfig(undefined, readStoredDashboardConfig()),
   );
@@ -198,10 +283,11 @@ export default function App() {
   }, [config.serverUrl, config.token, probe?.ok]);
 
   const authRequired = probe?.error?.startsWith("API 401") && !config.token.trim();
+  const isHome = location.pathname === "/";
   const loggedInWithCookie = probe?.ok && !config.token.trim() && probe.userId && probe.userId !== "default";
 
-  if (authRequired) {
-    const isConnect = typeof window !== "undefined" && window.location.pathname === "/connect";
+  if (authRequired && !isHome) {
+    const isConnect = location.pathname === "/connect";
     return (
       <LoginScreen
         config={config}
@@ -220,16 +306,9 @@ export default function App() {
 
   return (
     <>
-      <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between gap-3">
-        <nav className="flex items-center gap-1">
-          <NavLink to="/" end className={navLinkClass}>
-            Live
-          </NavLink>
-          <NavLink to="/messages" className={navLinkClass}>
-            Messages
-          </NavLink>
-        </nav>
-        <div className="flex items-center gap-3">
+      <AppHeader home={isHome} />
+      {!isHome ? (
+        <div className="border-b border-surface-3 px-4 py-2 flex items-center justify-end gap-3">
           <ConnectionStatus probe={probe} />
           {loggedInWithCookie ? (
             <button
@@ -247,9 +326,10 @@ export default function App() {
             Settings
           </Link>
         </div>
-      </header>
+      ) : null}
       <Routes>
-        <Route path="/" element={<Dashboard config={config} prefs={prefs} />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/live" element={<Dashboard config={config} prefs={prefs} />} />
         <Route path="/messages" element={<MessagesPage config={config} prefs={prefs} />} />
         <Route path="/connect" element={<ConnectPage config={config} />} />
         <Route
