@@ -155,6 +155,14 @@ async function moveFailed(paths, files) {
   }
 }
 
+async function unlinkIfExists(file) {
+  try {
+    await fs.unlink(file);
+  } catch (error) {
+    if (!error || error.code !== "ENOENT") throw error;
+  }
+}
+
 async function uploadEventBatch({ config, events, fetchImpl }) {
   const headers = {
     "content-type": "application/json",
@@ -228,7 +236,7 @@ export async function flushPending({ config, paths, fetchImpl = fetch } = {}) {
     });
   }
 
-  for (const file of batch.files) await fs.unlink(file);
+  for (const file of batch.files) await unlinkIfExists(file);
   const nextPending = await countPending(paths);
   return writeStateWithQueueStats(paths, {
     upload_status: "ok",
@@ -399,6 +407,7 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
 
   async function close() {
     if (flushTimer) clearInterval(flushTimer);
+    if (flushPromise) await flushPromise.catch(() => null);
     await new Promise((resolve) => server.close(resolve));
     await writeState(paths, { daemon_status: "stopped" });
   }
@@ -454,7 +463,7 @@ export async function startDaemon({ env = process.env } = {}) {
     stdio: ["ignore", out, err],
   });
   child.unref();
-  const deadline = Date.now() + 5_000;
+  const deadline = Date.now() + 30_000;
   let lastError = null;
   while (Date.now() < deadline) {
     try {
@@ -475,7 +484,17 @@ export async function stopDaemon({ env = process.env } = {}) {
   const pid = Number(raw.trim());
   if (!Number.isFinite(pid) || pid <= 0) throw new Error("Invalid daemon pid file");
   process.kill(pid, "SIGTERM");
-  return { stopped: true, pid };
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error && error.code === "ESRCH") return { stopped: true, pid };
+      throw error;
+    }
+    await sleep(100);
+  }
+  throw new Error(`Timed out waiting for Runlight daemon ${pid} to stop`);
 }
 
 export async function installLaunchAgent({ env = process.env } = {}) {

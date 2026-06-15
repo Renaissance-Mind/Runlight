@@ -405,8 +405,9 @@ async function runDaemonCommand(positional) {
   if (action === "restart") {
     try {
       await stopDaemon();
-    } catch {
-      // Restart is allowed when no daemon is running.
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("ENOENT") && !message.includes("ESRCH")) throw error;
     }
     const result = await startDaemon();
     printJson(result);

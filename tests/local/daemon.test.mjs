@@ -4,7 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import { createDaemonServer, drainPending, enqueueEvents, queryDaemon } from "../../src/local/daemon.js";
+import { createDaemonServer, drainPending, enqueueEvents, flushPending, queryDaemon } from "../../src/local/daemon.js";
 import { saveConfig } from "../../src/local/config.js";
 import { defaultConfig } from "../../src/local/config.js";
 import { resolvePaths } from "../../src/local/paths.js";
@@ -186,6 +186,34 @@ describe("local daemon", () => {
     assert.equal(body.state.pending_count, 0);
     assert.equal(maxInFlight, 1);
     assert.equal(calls, 1);
+  });
+
+  it("treats already removed queue files as uploaded during cleanup", async () => {
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const config = defaultConfig(env);
+    config.server_url = "http://runlight.test";
+    config.upload_token = "upload-token";
+    await saveConfig(config, env);
+
+    const paths = resolvePaths(env);
+    await enqueueEvents(paths, [testEvent()]);
+    const [queuedFile] = await fs.readdir(paths.pending);
+
+    const state = await flushPending({
+      config,
+      paths,
+      fetchImpl: async () => {
+        await fs.unlink(path.join(paths.pending, queuedFile));
+        return new Response(JSON.stringify({ events: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+
+    assert.equal(state.pending_count, 0);
+    assert.equal(state.upload_status, "ok");
   });
 
   it("flushes local-only events without requiring an upload token", async () => {
