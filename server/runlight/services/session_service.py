@@ -9,7 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from runlight.db.models import Event, Session
 from runlight.protocol import EventEnvelope, TERMINAL_EVENT_TYPES
-from runlight.services.status_engine import infer_status
+from runlight.services.status_engine import (
+    infer_status,
+    is_run_finish_event,
+    is_run_start_event,
+)
+
+RUNNING_STATUSES = {
+    "starting",
+    "running",
+    "tool_running",
+    "command_running",
+    "waiting_user",
+    "waiting_external",
+}
 
 
 async def upsert_session(db: AsyncSession, envelope: EventEnvelope, user_id: str) -> Session:
@@ -73,17 +86,24 @@ async def upsert_session(db: AsyncSession, envelope: EventEnvelope, user_id: str
     session.event_count += 1
     session.updated_at = now
 
-    RUNNING_STATUSES = {"starting", "running", "tool_running", "command_running", "waiting_user", "waiting_external"}
     prev_status = session.current_status
+
+    if is_run_start_event(envelope.event_type):
+        session.active_run_started_at = envelope.event_time
+    elif is_run_finish_event(envelope.event_type):
+        session.active_run_started_at = None
 
     session.current_status = infer_status(
         latest_event_type=session.latest_event_type,
         last_heartbeat_at=session.last_heartbeat_at,
         terminal_result=session.terminal_result,
         last_event_at=session.last_event_at,
+        active_run_started_at=session.active_run_started_at,
     )
 
-    if session.current_status in RUNNING_STATUSES and prev_status not in RUNNING_STATUSES:
+    if is_run_start_event(envelope.event_type):
+        session.current_run_started_at = envelope.event_time
+    elif session.current_status in RUNNING_STATUSES and prev_status not in RUNNING_STATUSES:
         session.current_run_started_at = envelope.event_time
 
     return session
@@ -104,6 +124,7 @@ async def refresh_session_statuses(db: AsyncSession, user_id: str) -> bool:
             last_heartbeat_at=session.last_heartbeat_at,
             terminal_result=session.terminal_result,
             last_event_at=session.last_event_at,
+            active_run_started_at=session.active_run_started_at,
         )
         if session.current_status != next_status:
             session.current_status = next_status

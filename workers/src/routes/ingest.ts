@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env, EventEnvelope, EventBatch } from "../types";
 import { resolveRequestUser } from "../auth";
-import { inferStatus, nextCurrentRunStartedAt, nextTerminalResult } from "../status";
+import { inferStatus, nextActiveRunStartedAt, nextCurrentRunStartedAt, nextTerminalResult } from "../status";
 
 export const ingest = new Hono<{ Bindings: Env }>();
 
@@ -97,18 +97,21 @@ async function upsertSession(
 
   if (!existing) {
     const terminalResult = nextTerminalResult(envelope.event_type);
+    const activeRunStartedAt = nextActiveRunStartedAt(envelope.event_type, envelope.event_time, null);
     const status = inferStatus(
       envelope.event_type,
       null,
       terminalResult,
       envelope.event_time,
       staleSec,
+      activeRunStartedAt,
     );
     const currentRunStartedAt = nextCurrentRunStartedAt(
       status,
       "starting",
       envelope.event_time,
       null,
+      envelope.event_type,
     );
 
     await db
@@ -118,8 +121,8 @@ async function upsertSession(
           machine_hostname, machine_os, machine_arch, machine_user, machine_id,
           workspace_cwd, workspace_repo_root, workspace_git_branch, workspace_git_commit, workspace_project_name,
           current_status, latest_event_type, started_at, last_event_at, last_heartbeat_at,
-          event_count, terminal_result, current_run_started_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          event_count, terminal_result, current_run_started_at, active_run_started_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         envelope.session_id,
@@ -149,6 +152,7 @@ async function upsertSession(
         1,
         terminalResult,
         currentRunStartedAt,
+        activeRunStartedAt,
         now,
       )
       .run();
@@ -214,6 +218,11 @@ async function upsertSession(
   const lastHb = envelope.event_type === "session.heartbeat"
     ? envelope.event_time
     : (existing.last_heartbeat_at as string | null);
+  const activeRunStartedAt = nextActiveRunStartedAt(
+    envelope.event_type,
+    envelope.event_time,
+    existing.active_run_started_at as string | null,
+  );
 
   const status = inferStatus(
     envelope.event_type,
@@ -221,6 +230,7 @@ async function upsertSession(
     terminalResult,
     envelope.event_time,
     staleSec,
+    activeRunStartedAt,
   );
   updates.push("current_status = ?");
   params.push(status);
@@ -230,10 +240,16 @@ async function upsertSession(
     existing.current_status as string | null,
     envelope.event_time,
     existing.current_run_started_at as string | null,
+    envelope.event_type,
   );
   if (nextRunStartedAt !== (existing.current_run_started_at as string | null)) {
     updates.push("current_run_started_at = ?");
     params.push(nextRunStartedAt);
+  }
+
+  if (activeRunStartedAt !== (existing.active_run_started_at as string | null)) {
+    updates.push("active_run_started_at = ?");
+    params.push(activeRunStartedAt);
   }
 
   params.push(envelope.session_id);

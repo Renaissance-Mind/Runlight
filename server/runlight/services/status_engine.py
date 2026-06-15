@@ -12,6 +12,14 @@ from runlight.config import settings
 from runlight.protocol import TERMINAL_EVENT_TYPES
 
 
+def is_run_start_event(event_type: str | None) -> bool:
+    return event_type == "message.started"
+
+
+def is_run_finish_event(event_type: str | None) -> bool:
+    return event_type == "message.finished" or bool(event_type in TERMINAL_EVENT_TYPES)
+
+
 def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
@@ -24,6 +32,7 @@ def infer_status(
     active_started_types: list[str] | None = None,
     terminal_result: str | None = None,
     last_event_at: datetime | None = None,
+    active_run_started_at: datetime | None = None,
 ) -> str:
     if terminal_result:
         return terminal_result
@@ -45,6 +54,13 @@ def infer_status(
 
     if latest_event_type == "message.finished":
         return "finished"
+
+    if active_run_started_at is not None and last_heartbeat_at is None:
+        if latest_event_type == "command.started":
+            return "command_running"
+        if latest_event_type == "tool.started":
+            return "tool_running"
+        return "running"
 
     stale_reference = last_heartbeat_at or last_event_at
     if stale_reference:

@@ -28,10 +28,22 @@ class TestStatusEngine:
         old = datetime.now(timezone.utc) - timedelta(seconds=300)
         assert infer_status("message.finished", None, last_event_at=old) == "finished"
 
-    def test_completed_action_quiet_is_finished_not_stale(self):
+    def test_completed_action_quiet_is_finished_not_stale_without_active_run(self):
         old = datetime.now(timezone.utc) - timedelta(seconds=300)
         assert infer_status("tool.finished", None, last_event_at=old) == "finished"
         assert infer_status("command.finished", None, last_event_at=old) == "finished"
+
+    def test_completed_action_inside_active_run_stays_running(self):
+        old = datetime.now(timezone.utc) - timedelta(seconds=300)
+        active = datetime.now(timezone.utc) - timedelta(seconds=600)
+        assert (
+            infer_status("tool.finished", None, last_event_at=old, active_run_started_at=active)
+            == "running"
+        )
+        assert (
+            infer_status("command.finished", None, last_event_at=old, active_run_started_at=active)
+            == "running"
+        )
 
     def test_started_action_quiet_is_stale(self):
         old = datetime.now(timezone.utc) - timedelta(seconds=300)

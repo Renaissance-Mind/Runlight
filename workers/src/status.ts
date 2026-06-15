@@ -13,8 +13,26 @@ export const RUNNING_STATUSES = new Set([
   "waiting_external",
 ]);
 
+export function isRunStartEvent(eventType: string | null | undefined): boolean {
+  return eventType === "message.started";
+}
+
+export function isRunFinishEvent(eventType: string | null | undefined): boolean {
+  return Boolean(eventType === "message.finished" || (eventType && TERMINAL_EVENT_TYPES.has(eventType)));
+}
+
 export function isRunningStatus(status: string | null | undefined): boolean {
   return Boolean(status && RUNNING_STATUSES.has(status));
+}
+
+export function nextActiveRunStartedAt(
+  latestEventType: string,
+  eventTime: string,
+  currentValue: string | null = null,
+): string | null {
+  if (isRunStartEvent(latestEventType)) return eventTime;
+  if (isRunFinishEvent(latestEventType)) return null;
+  return currentValue;
 }
 
 export function nextCurrentRunStartedAt(
@@ -22,7 +40,9 @@ export function nextCurrentRunStartedAt(
   previousStatus: string | null | undefined,
   eventTime: string,
   currentValue: string | null = null,
+  latestEventType: string | null = null,
 ): string | null {
+  if (isRunStartEvent(latestEventType)) return eventTime;
   if (isRunningStatus(nextStatus) && !isRunningStatus(previousStatus)) {
     return eventTime;
   }
@@ -46,6 +66,7 @@ export function inferStatus(
   terminalResult: string | null,
   lastEventAt: string | null,
   heartbeatStaleSeconds: number,
+  activeRunStartedAt: string | null = null,
 ): string {
   if (terminalResult) return terminalResult;
 
@@ -59,6 +80,12 @@ export function inferStatus(
   if (latestEventType === "external.waiting") return "waiting_external";
   if (latestEventType === "permission.requested") return "waiting_user";
   if (latestEventType === "message.finished") return "finished";
+
+  if (activeRunStartedAt && !lastHeartbeatAt) {
+    if (latestEventType === "command.started") return "command_running";
+    if (latestEventType === "tool.started") return "tool_running";
+    return "running";
+  }
 
   const staleRef = lastHeartbeatAt || lastEventAt;
   if (staleRef) {

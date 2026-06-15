@@ -25,6 +25,8 @@ async def ensure_schema(conn: AsyncConnection) -> None:
         "sessions": {
             "session_name": "TEXT",
             "session_pin": bool_sql,
+            "current_run_started_at": "TIMESTAMP",
+            "active_run_started_at": "TIMESTAMP",
         },
         "events": {
             "session_name": "TEXT",

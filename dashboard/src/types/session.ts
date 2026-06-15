@@ -24,6 +24,7 @@ export interface Session {
   event_count: number;
   terminal_result: string | null;
   current_run_started_at: string | null;
+  active_run_started_at: string | null;
 }
 
 export interface SessionEvent {

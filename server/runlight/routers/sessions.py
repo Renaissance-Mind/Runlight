@@ -58,6 +58,7 @@ def _session_dict(s) -> dict:
         "event_count": s.event_count,
         "terminal_result": s.terminal_result,
         "current_run_started_at": s.current_run_started_at.isoformat() if s.current_run_started_at else None,
+        "active_run_started_at": s.active_run_started_at.isoformat() if s.active_run_started_at else None,
     }
 
 

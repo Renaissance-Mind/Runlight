@@ -41,6 +41,7 @@ function sessionToJson(row: SessionRow) {
     last_event_at: row.last_event_at,
     last_heartbeat_at: row.last_heartbeat_at,
     current_run_started_at: row.current_run_started_at ?? null,
+    active_run_started_at: row.active_run_started_at ?? null,
     event_count: row.event_count,
     terminal_result: row.terminal_result,
   };
@@ -69,7 +70,8 @@ async function refreshStatuses(db: D1Database, userId: string, staleSec: number)
   const terminal = ["completed", "failed", "aborted"];
   const result = await db
     .prepare(
-      `SELECT id, latest_event_type, last_heartbeat_at, terminal_result, last_event_at, current_status
+      `SELECT id, latest_event_type, last_heartbeat_at, terminal_result,
+              last_event_at, current_status, active_run_started_at
        FROM sessions WHERE user_id = ? AND current_status NOT IN (?, ?, ?)`,
     )
     .bind(userId, ...terminal)
@@ -85,6 +87,7 @@ async function refreshStatuses(db: D1Database, userId: string, staleSec: number)
       r.terminal_result as string | null,
       r.last_event_at as string | null,
       staleSec,
+      r.active_run_started_at as string | null,
     );
     if (next !== r.current_status) {
       await db

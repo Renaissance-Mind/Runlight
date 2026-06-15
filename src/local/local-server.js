@@ -25,11 +25,26 @@ const DEFAULT_SETTINGS = {
   updated_at: null,
 };
 
+function isRunStartEvent(eventType) {
+  return eventType === "message.started";
+}
+
+function isRunFinishEvent(eventType) {
+  return eventType === "message.finished" || COMPLETION_EVENT_TYPES.has(eventType);
+}
+
 function parseUTC(iso) {
   return new Date(String(iso || "").endsWith("Z") ? iso : `${iso}Z`).getTime();
 }
 
-function inferStatus(latestEventType, lastHeartbeatAt, terminalResult, lastEventAt, heartbeatStaleSeconds = 120) {
+function inferStatus(
+  latestEventType,
+  lastHeartbeatAt,
+  terminalResult,
+  lastEventAt,
+  heartbeatStaleSeconds = 120,
+  activeRunStartedAt = null,
+) {
   if (terminalResult) return terminalResult;
   if (latestEventType === "session.completed") return "completed";
   if (latestEventType === "session.failed") return "failed";
@@ -37,6 +52,12 @@ function inferStatus(latestEventType, lastHeartbeatAt, terminalResult, lastEvent
   if (latestEventType === "user_input.waiting" || latestEventType === "permission.requested") return "waiting_user";
   if (latestEventType === "external.waiting") return "waiting_external";
   if (latestEventType === "message.finished") return "finished";
+
+  if (activeRunStartedAt && !lastHeartbeatAt) {
+    if (latestEventType === "command.started") return "command_running";
+    if (latestEventType === "tool.started") return "tool_running";
+    return "running";
+  }
 
   const staleRef = lastHeartbeatAt || lastEventAt;
   if (staleRef) {
@@ -159,7 +180,12 @@ function upsertSession(store, event) {
   const lastHeartbeatAt = event.event_type === "session.heartbeat"
     ? event.event_time
     : current?.last_heartbeat_at || null;
-  const nextStatus = inferStatus(event.event_type, lastHeartbeatAt, terminalResult, event.event_time);
+  const activeRunStartedAt = isRunStartEvent(event.event_type)
+    ? event.event_time
+    : isRunFinishEvent(event.event_type)
+      ? null
+      : current?.active_run_started_at || null;
+  const nextStatus = inferStatus(event.event_type, lastHeartbeatAt, terminalResult, event.event_time, 120, activeRunStartedAt);
   const summary = event.event_type === "session.summary.updated" && event.summary
     ? event.summary
     : current?.summary || event.summary || null;
@@ -191,9 +217,12 @@ function upsertSession(store, event) {
     last_heartbeat_at: lastHeartbeatAt,
     event_count: Number(current?.event_count || 0) + 1,
     terminal_result: terminalResult,
-    current_run_started_at: RUNNING_STATUSES.has(nextStatus) && !RUNNING_STATUSES.has(previousStatus)
+    current_run_started_at: isRunStartEvent(event.event_type)
       ? event.event_time
-      : current?.current_run_started_at || null,
+      : RUNNING_STATUSES.has(nextStatus) && !RUNNING_STATUSES.has(previousStatus)
+        ? event.event_time
+        : current?.current_run_started_at || null,
+    active_run_started_at: activeRunStartedAt,
   };
   return store.sessions[event.session_id];
 }
@@ -225,6 +254,7 @@ function sessionToJson(session) {
     event_count: session.event_count,
     terminal_result: session.terminal_result,
     current_run_started_at: session.current_run_started_at,
+    active_run_started_at: session.active_run_started_at || null,
   };
 }
 

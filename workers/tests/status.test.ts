@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   inferStatus,
   isRunningStatus,
+  nextActiveRunStartedAt,
   nextCurrentRunStartedAt,
   nextTerminalResult,
 } from "../src/status.ts";
@@ -13,9 +14,21 @@ function secondsAgo(seconds: number): string {
 }
 
 describe("worker status inference", () => {
-  it("keeps completed action sessions finished when they go quiet", () => {
+  it("keeps completed action sessions finished when they go quiet outside an active run", () => {
     assert.equal(inferStatus("tool.finished", null, null, secondsAgo(300), 120), "finished");
     assert.equal(inferStatus("command.finished", null, null, secondsAgo(300), 120), "finished");
+  });
+
+  it("keeps an active run running after an individual tool completes", () => {
+    const activeRunStartedAt = secondsAgo(600);
+    assert.equal(
+      inferStatus("tool.finished", null, null, secondsAgo(300), 120, activeRunStartedAt),
+      "running",
+    );
+    assert.equal(
+      inferStatus("command.finished", null, null, secondsAgo(300), 120, activeRunStartedAt),
+      "running",
+    );
   });
 
   it("marks started action sessions stale when they go quiet", () => {
@@ -39,12 +52,17 @@ describe("worker status inference", () => {
     assert.equal(isRunningStatus("running"), true);
     assert.equal(isRunningStatus("finished"), false);
     assert.equal(
+      nextActiveRunStartedAt("message.started", "2026-06-13T19:10:00.000Z", "old"),
+      "2026-06-13T19:10:00.000Z",
+    );
+    assert.equal(nextActiveRunStartedAt("message.finished", "2026-06-13T19:12:00.000Z", "old"), null);
+    assert.equal(
       nextCurrentRunStartedAt("running", "finished", "2026-06-13T19:10:00.000Z", "old"),
       "2026-06-13T19:10:00.000Z",
     );
     assert.equal(
-      nextCurrentRunStartedAt("running", "starting", "2026-06-13T19:10:00.000Z", null),
-      null,
+      nextCurrentRunStartedAt("running", "starting", "2026-06-13T19:10:00.000Z", null, "message.started"),
+      "2026-06-13T19:10:00.000Z",
     );
     assert.equal(
       nextCurrentRunStartedAt("finished", "running", "2026-06-13T19:10:00.000Z", "old"),
