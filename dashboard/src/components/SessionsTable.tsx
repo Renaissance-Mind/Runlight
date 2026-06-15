@@ -61,12 +61,6 @@ function duration(startedAt: string | null, lastEventAt: string | null): string 
   return `${hr}h ${min % 60}m`;
 }
 
-function shortPath(cwd: string | null): string {
-  if (!cwd) return "-";
-  const parts = cwd.split("/");
-  return parts.length > 2 ? `.../${parts.slice(-2).join("/")}` : cwd;
-}
-
 function readStoredStringList(key: string): string[] {
   if (typeof window === "undefined") return [];
   const raw = window.localStorage.getItem(key);
@@ -166,7 +160,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
     () => new Set(collapsedProjects),
     [collapsedProjects],
   );
-  const columnCount = 11;
+  const columnCount = 9;
 
   const toggleDevice = (deviceKey: string) => {
     setCollapsedDevices((previousDevices) => {
@@ -251,10 +245,6 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
           )}
         </Link>
       </td>
-      <td className="px-3 py-2 text-gray-400">
-        {s.workspace_project_name || "-"}
-      </td>
-      <td className="px-3 py-2 text-gray-400">{shortPath(s.workspace_cwd)}</td>
       <td className="px-3 py-2 text-accent-purple">
         {s.workspace_git_branch || "-"}
       </td>
@@ -300,8 +290,6 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
             <th className="px-3 py-2">Pin</th>
             <th className="px-3 py-2">Agent</th>
             <th className="px-3 py-2">Session</th>
-            <th className="px-3 py-2">Project</th>
-            <th className="px-3 py-2">Path</th>
             <th className="px-3 py-2">Branch</th>
             <th className="px-3 py-2">Event</th>
             <th className="px-3 py-2 text-right">HB</th>
@@ -418,7 +406,7 @@ export default function SessionsTable({ sessions, loading, error }: Props) {
                               >
                                 {projectCollapsed ? ">" : "v"}
                               </button>
-                              <span className="truncate text-xs font-medium text-gray-500">
+                              <span className="truncate text-sm font-semibold text-black">
                                 {projectGroup.projectName}
                               </span>
                               <span className="shrink-0 text-[10px] text-gray-600">
