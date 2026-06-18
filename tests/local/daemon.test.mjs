@@ -36,6 +36,16 @@ async function freePort() {
   return address.port;
 }
 
+function codexSessionDir(codexHome, date = new Date()) {
+  return path.join(
+    codexHome,
+    "sessions",
+    String(date.getFullYear()),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  );
+}
+
 function testEvent() {
   return {
     session_id: "sess-daemon",
@@ -214,6 +224,134 @@ describe("local daemon", () => {
 
     assert.equal(state.pending_count, 0);
     assert.equal(state.upload_status, "ok");
+  });
+
+  it("ignores unpersisted Codex startup sidecar sessions from raw hooks", async () => {
+    const received = [];
+    const remote = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+      });
+      req.on("end", () => {
+        received.push(JSON.parse(raw));
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ events: [] }));
+      });
+    });
+    const remoteAddress = await listen(remote);
+    servers.push(() => closeServer(remote));
+
+    const home = await tempHome();
+    const codexHome = await fs.mkdtemp(path.join(os.tmpdir(), "runlight-codex-home-"));
+    const env = { ...process.env, RUNLIGHT_HOME: home, CODEX_HOME: codexHome };
+    const config = defaultConfig(env);
+    config.server_url = `http://127.0.0.1:${remoteAddress.port}`;
+    config.upload_token = "upload-token";
+    config.daemon.port = 0;
+    await saveConfig(config, env);
+
+    const daemon = await createDaemonServer({ env });
+    servers.push(() => daemon.close());
+
+    const startResponse = await fetch(`http://127.0.0.1:${daemon.server.address().port}/events/raw`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify({
+        agent: "codex",
+        input: {
+          hook_event_name: "SessionStart",
+          session_id: "sess-sidecar",
+          source: "startup",
+          model: "gpt-5.4",
+          cwd: process.cwd(),
+        },
+      }),
+    });
+    assert.equal(startResponse.status, 202);
+    assert.equal((await startResponse.json()).ignored_count, 1);
+
+    const promptResponse = await fetch(`http://127.0.0.1:${daemon.server.address().port}/events/raw`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify({
+        agent: "codex",
+        input: {
+          hook_event_name: "UserPromptSubmit",
+          session_id: "sess-sidecar",
+          cwd: process.cwd(),
+        },
+      }),
+    });
+    assert.equal(promptResponse.status, 202);
+    assert.equal((await promptResponse.json()).ignored_count, 1);
+
+    await daemon.flush();
+    assert.equal(received.length, 0);
+  });
+
+  it("keeps persisted Codex startup sessions from raw hooks", async () => {
+    const received = [];
+    const remote = http.createServer((req, res) => {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+      });
+      req.on("end", () => {
+        received.push(JSON.parse(raw));
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ events: [] }));
+      });
+    });
+    const remoteAddress = await listen(remote);
+    servers.push(() => closeServer(remote));
+
+    const home = await tempHome();
+    const codexHome = await fs.mkdtemp(path.join(os.tmpdir(), "runlight-codex-home-"));
+    const sessionDir = codexSessionDir(codexHome);
+    await fs.mkdir(sessionDir, { recursive: true });
+    await fs.writeFile(path.join(sessionDir, "rollout-test-sess-visible.jsonl"), "{}\n");
+
+    const env = { ...process.env, RUNLIGHT_HOME: home, CODEX_HOME: codexHome };
+    const config = defaultConfig(env);
+    config.server_url = `http://127.0.0.1:${remoteAddress.port}`;
+    config.upload_token = "upload-token";
+    config.daemon.port = 0;
+    await saveConfig(config, env);
+
+    const daemon = await createDaemonServer({ env });
+    servers.push(() => daemon.close());
+
+    const response = await fetch(`http://127.0.0.1:${daemon.server.address().port}/events/raw`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify({
+        agent: "codex",
+        input: {
+          hook_event_name: "SessionStart",
+          session_id: "sess-visible",
+          source: "startup",
+          model: "gpt-5.5",
+          cwd: process.cwd(),
+        },
+      }),
+    });
+    assert.equal(response.status, 202);
+    assert.equal((await response.json()).ignored_count, 0);
+
+    await daemon.flush();
+    assert.equal(received.length, 1);
+    assert.equal(received[0].events[0].session_id, "sess-visible");
+    assert.equal(received[0].events[0].event_type, "session.started");
   });
 
   it("flushes local-only events without requiring an upload token", async () => {

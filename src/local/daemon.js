@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadConfig, loadOrCreateConfig, redactConfig } from "./config.js";
-import { enrichRawHookEvents } from "./enrich.js";
+import { enrichRawHookEvents, shouldIgnoreUnpersistedCodexStartup } from "./enrich.js";
 import { ensureRuntimeDirs, localDaemonUrl, resolvePaths } from "./paths.js";
 
 const MAX_BATCH_EVENTS = 200;
@@ -294,6 +294,7 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
   let flushTimer = null;
   let flushPromise = null;
   let flushRequested = false;
+  const ignoredRawCodexSessions = new Set();
 
   async function scheduleFlush() {
     if (flushPromise) {
@@ -357,14 +358,34 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
     if (req.method === "POST" && url.pathname === "/events/raw") {
       const body = await readJsonRequest(req);
       const rawEvents = normalizeRawHookEvents(body);
-      const events = await enrichRawHookEvents(rawEvents, freshConfig, env);
+      const acceptedRawEvents = [];
+      let ignoredCount = 0;
+
+      for (const raw of rawEvents) {
+        const input = raw?.input || {};
+        const sessionId = input.session_id || "";
+        if (raw?.agent === "codex" && sessionId && ignoredRawCodexSessions.has(sessionId)) {
+          ignoredCount += 1;
+          continue;
+        }
+
+        if (raw?.agent === "codex" && await shouldIgnoreUnpersistedCodexStartup(input, env)) {
+          ignoredRawCodexSessions.add(sessionId);
+          ignoredCount += 1;
+          continue;
+        }
+
+        acceptedRawEvents.push(raw);
+      }
+
+      const events = await enrichRawHookEvents(acceptedRawEvents, freshConfig, env);
       if (events.length === 0) {
-        jsonResponse(res, 202, { status: "ignored", count: 0, pending_count: await countPending(paths) });
+        jsonResponse(res, 202, { status: "ignored", count: 0, ignored_count: ignoredCount, pending_count: await countPending(paths) });
         return;
       }
       const queued = await enqueueEvents(paths, events);
       scheduleFlush();
-      jsonResponse(res, 202, { status: "queued", count: queued.count, pending_count: await countPending(paths) });
+      jsonResponse(res, 202, { status: "queued", count: queued.count, ignored_count: ignoredCount, pending_count: await countPending(paths) });
       return;
     }
 

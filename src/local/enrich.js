@@ -47,6 +47,86 @@ async function resolveCodexSessionName(sessionId, env = process.env) {
   return "";
 }
 
+async function codexSessionIndexHasId(sessionId, env = process.env) {
+  const codexHome = env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  const sessionIndex = env.RUNLIGHT_CODEX_SESSION_INDEX || path.join(codexHome, "session_index.jsonl");
+  try {
+    const text = await fs.readFile(sessionIndex, "utf8");
+    for (const line of text.trim().split("\n")) {
+      if (!line.trim()) continue;
+      let item;
+      try {
+        item = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (item.id === sessionId) return true;
+    }
+  } catch (error) {
+    if (!error || error.code !== "ENOENT") throw error;
+  }
+  return false;
+}
+
+function localDateParts(date) {
+  return [
+    String(date.getFullYear()),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ];
+}
+
+function utcDateParts(date) {
+  return [
+    String(date.getUTCFullYear()),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ];
+}
+
+function candidateCodexSessionDirs(codexHome, now = new Date()) {
+  const dirs = new Set();
+  for (const offsetDays of [-1, 0, 1]) {
+    const date = new Date(now.getTime() + offsetDays * 24 * 60 * 60 * 1000);
+    dirs.add(path.join(codexHome, "sessions", ...localDateParts(date)));
+    dirs.add(path.join(codexHome, "sessions", ...utcDateParts(date)));
+  }
+  dirs.add(path.join(codexHome, "archived_sessions"));
+  return Array.from(dirs);
+}
+
+async function dirHasCodexSessionFile(dir, sessionId) {
+  try {
+    const names = await fs.readdir(dir);
+    return names.some((name) => name.includes(sessionId) && name.endsWith(".jsonl"));
+  } catch (error) {
+    if (!error || error.code !== "ENOENT") throw error;
+  }
+  return false;
+}
+
+export async function isKnownCodexSession(sessionId, env = process.env, now = new Date()) {
+  if (!sessionId) return false;
+  if (await codexSessionIndexHasId(sessionId, env)) return true;
+
+  const codexHome = env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  for (const dir of candidateCodexSessionDirs(codexHome, now)) {
+    if (await dirHasCodexSessionFile(dir, sessionId)) return true;
+  }
+  return false;
+}
+
+export async function shouldIgnoreUnpersistedCodexStartup(input, env = process.env, now = new Date()) {
+  if (booleanLike(env.RUNLIGHT_ALLOW_UNPERSISTED_CODEX_SESSIONS)) return false;
+  if ((input.hook_event_name || "") !== "SessionStart") return false;
+  if ((input.source || input.automation_source || "") !== "startup") return false;
+  if (!input.session_id) return false;
+
+  if (await isKnownCodexSession(input.session_id, env, now)) return false;
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  return !(await isKnownCodexSession(input.session_id, env, new Date()));
+}
+
 async function resolveCodexSessionPin(sessionId, env = process.env) {
   const codexHome = env.CODEX_HOME || path.join(os.homedir(), ".codex");
   const globalState = env.RUNLIGHT_CODEX_GLOBAL_STATE || path.join(codexHome, ".codex-global-state.json");
