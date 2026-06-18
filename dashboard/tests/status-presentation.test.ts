@@ -7,13 +7,13 @@ import {
 } from "../src/api/statusPresentation.ts";
 
 describe("dashboard status presentation", () => {
-  it("marks running sessions orange and recent finished sessions green", () => {
+  it("maps status tones to the dashboard color palette", () => {
     const nowMs = Date.parse("2026-06-08T10:00:00Z");
 
     assert.equal(
       getStatusPresentation("running", "2026-06-08T09:59:00Z", nowMs)
         .dotClass,
-      "bg-accent-orange",
+      "bg-accent-blue",
     );
     assert.equal(
       getStatusPresentation("finished", "2026-06-08T09:30:00Z", nowMs).tone,
@@ -27,6 +27,15 @@ describe("dashboard status presentation", () => {
     assert.equal(
       getStatusPresentation("finished", "2026-06-08T09:29:59Z", nowMs).tone,
       "finished",
+    );
+    assert.equal(
+      getStatusPresentation("finished", "2026-06-08T09:29:59Z", nowMs)
+        .dotClass,
+      "bg-accent-light-green",
+    );
+    assert.equal(
+      getStatusPresentation("stale", "2026-06-08T09:50:00Z", nowMs).dotClass,
+      "bg-accent-orange",
     );
   });
 

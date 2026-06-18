@@ -28,8 +28,8 @@ const STATUS_PRESENTATIONS: Record<StatusTone, StatusPresentation> = {
   running: {
     tone: "running",
     label: "Running",
-    dotClass: "bg-accent-orange",
-    textClass: "text-accent-orange",
+    dotClass: "bg-accent-blue",
+    textClass: "text-accent-blue",
     pulse: true,
   },
   recent_finished: {
@@ -41,14 +41,14 @@ const STATUS_PRESENTATIONS: Record<StatusTone, StatusPresentation> = {
   finished: {
     tone: "finished",
     label: "Finished",
-    dotClass: "bg-accent-blue",
-    textClass: "text-accent-blue",
+    dotClass: "bg-accent-light-green",
+    textClass: "text-accent-light-green",
   },
   stale: {
     tone: "stale",
     label: "Stale",
-    dotClass: "bg-accent-yellow",
-    textClass: "text-accent-yellow",
+    dotClass: "bg-accent-orange",
+    textClass: "text-accent-orange",
   },
   failed: {
     tone: "failed",

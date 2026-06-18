@@ -13,6 +13,7 @@ export default {
         },
         accent: {
           green: "#22c55e",
+          "light-green": "#86efac",
           yellow: "#eab308",
           red: "#ef4444",
           blue: "#3b82f6",
