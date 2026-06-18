@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
+import { parseCorsOrigins } from "../src/cors.ts";
+
 const testDir = dirname(fileURLToPath(import.meta.url));
 const indexSource = readFileSync(join(testDir, "../src/index.ts"), "utf8");
 const sessionsSource = readFileSync(join(testDir, "../src/routes/sessions.ts"), "utf8");
@@ -14,6 +16,15 @@ describe("worker HTTP contract", () => {
       indexSource,
       /allowMethods:\s*\[[^\]]*"DELETE"[^\]]*"PATCH"|allowMethods:\s*\[[^\]]*"PATCH"[^\]]*"DELETE"/s,
     );
+  });
+
+  it("treats wildcard CORS config as a browser-origin echo", async () => {
+    const origin = parseCorsOrigins("*");
+
+    assert.equal(typeof origin, "function");
+    assert.equal(origin("http://127.0.0.1:5176"), "http://127.0.0.1:5176");
+    assert.equal(origin(""), null);
+    assert.match(indexSource, /credentials:\s*true/);
   });
 
   it("exposes recent events for the messages feed", () => {

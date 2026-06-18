@@ -12,9 +12,10 @@ async function fetchJSON<T>(
   init?: RequestInit,
 ): Promise<T> {
   const url = buildApiUrl(config.serverUrl, path);
+  const hasToken = config.token.trim().length > 0;
   const resp = await fetch(url, {
     ...init,
-    credentials: "include",
+    credentials: hasToken ? "omit" : "include",
     headers: {
       ...buildRequestHeaders(config.token),
       ...init?.headers,

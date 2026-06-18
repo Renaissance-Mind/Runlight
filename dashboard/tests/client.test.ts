@@ -16,9 +16,11 @@ import {
 
 let serverUrl = "";
 let lastAuthorization: string | undefined;
+let lastCookie: string | undefined;
 
 const server = createServer((req, res) => {
   lastAuthorization = req.headers.authorization;
+  lastCookie = req.headers.cookie;
   res.setHeader("Content-Type", "application/json");
 
   if (req.url === "/api/health") {
@@ -119,6 +121,50 @@ describe("dashboard runtime API client", () => {
 
     assert.deepEqual(user, { user_id: "user-alice" });
     assert.equal(lastAuthorization, "Bearer tok-user-1");
+    assert.equal(lastCookie, undefined);
+  });
+
+  it("omits browser credentials when a bearer token is configured", async () => {
+    const originalFetch = globalThis.fetch;
+    let capturedInit: RequestInit | undefined;
+
+    globalThis.fetch = async (_input, init) => {
+      capturedInit = init;
+      return new Response(JSON.stringify({ user_id: "user-alice" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+
+    try {
+      await fetchCurrentUser({ serverUrl: "https://runlight.example.com", token: "tok-user-1" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(capturedInit?.credentials, "omit");
+    assert.equal((capturedInit?.headers as Record<string, string>).Authorization, "Bearer tok-user-1");
+  });
+
+  it("includes browser credentials when no bearer token is configured", async () => {
+    const originalFetch = globalThis.fetch;
+    let capturedInit: RequestInit | undefined;
+
+    globalThis.fetch = async (_input, init) => {
+      capturedInit = init;
+      return new Response(JSON.stringify({ user_id: "default" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+
+    try {
+      await fetchCurrentUser({ serverUrl: "https://runlight.example.com", token: "" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(capturedInit?.credentials, "include");
   });
 
   it("probes health and current user for reusable dashboard surfaces", async () => {

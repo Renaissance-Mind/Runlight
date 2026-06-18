@@ -9,17 +9,18 @@ import { tokens } from "./routes/tokens";
 import { userSettings } from "./routes/userSettings";
 import { connect } from "./routes/connect";
 import type { Env } from "./types";
+import { parseCorsOrigins } from "./cors";
 
 const app = new Hono<{ Bindings: Env }>();
 
 function mount(base: "" | "/server") {
   const apiBase = `${base}/api`;
   app.use(`${apiBase}/*`, async (c, next) => {
-    const origins = (c.env.CORS_ORIGINS || "*").split(",").map((s) => s.trim());
     return cors({
-      origin: origins,
+      origin: parseCorsOrigins(c.env.CORS_ORIGINS),
       allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
+      credentials: true,
     })(c, next);
   });
 
