@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import type { Session, SessionEvent } from "../types/session";
 import type { DashboardConnectionConfig } from "../api/config";
@@ -138,16 +138,21 @@ function EventRow({ event }: { event: SessionEvent }) {
 export default function MessagesPage({
   config,
   prefs,
+  onRefreshActionChange,
 }: {
   config: DashboardConnectionConfig;
   prefs: DashboardPreferences;
+  onRefreshActionChange: (action: { label: string; onClick: () => void } | null) => void;
 }) {
   const { events: rawEvents, loading: eventsLoading, error: eventsError, refresh: refreshEvents } = useRecentEvents(config, 3000, 200);
   const { sessions: liveSessions, loading: liveLoading, error: liveError, refresh: refreshLive } = useLiveSessions(config, 3000);
 
   const loading = eventsLoading && liveLoading;
   const error = eventsError || liveError;
-  const refresh = () => { refreshEvents(); refreshLive(); };
+  const refresh = useCallback(() => {
+    refreshEvents();
+    refreshLive();
+  }, [refreshEvents, refreshLive]);
 
   const LIVE_STATUSES = new Set(["starting", "running", "tool_running", "command_running", "waiting_user", "waiting_external"]);
 
@@ -202,23 +207,13 @@ export default function MessagesPage({
     [messageGroups, prefs.messageMaxColumns],
   );
 
+  useEffect(() => {
+    onRefreshActionChange({ label: "Refresh", onClick: refresh });
+    return () => onRefreshActionChange(null);
+  }, [onRefreshActionChange, refresh]);
+
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold text-white tracking-tight">
-            Runlight
-          </h1>
-          <span className="text-[10px] text-gray-600 uppercase">Messages</span>
-        </div>
-        <button
-          onClick={refresh}
-          className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
-        >
-          Refresh
-        </button>
-      </header>
-
       <main className="flex-1">
         {error ? (
           <div className="m-4 p-4 text-accent-red bg-surface-2 rounded">

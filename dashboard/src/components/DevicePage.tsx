@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import type { DashboardConnectionConfig } from "../api/config";
 import { formatCompactRelativeTime } from "../api/viewModels";
@@ -87,26 +88,22 @@ function DeviceRow({ device }: { device: DeviceRecord }) {
   );
 }
 
-export default function DevicePage({ config }: { config: DashboardConnectionConfig }) {
+export default function DevicePage({
+  config,
+  onRefreshActionChange,
+}: {
+  config: DashboardConnectionConfig;
+  onRefreshActionChange: (action: { label: string; onClick: () => void } | null) => void;
+}) {
   const { devices, loading, error, refresh } = useDevices(config, 5000);
+
+  useEffect(() => {
+    onRefreshActionChange({ label: "Refresh", onClick: refresh });
+    return () => onRefreshActionChange(null);
+  }, [onRefreshActionChange, refresh]);
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold text-white tracking-tight">
-            Runlight
-          </h1>
-          <span className="text-[10px] text-gray-600 uppercase">Devices</span>
-        </div>
-        <button
-          onClick={refresh}
-          className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
-        >
-          Refresh
-        </button>
-      </header>
-
       <main className="flex-1 px-4 py-4">
         {error ? (
           <div className="p-4 text-accent-red bg-surface-2 rounded">

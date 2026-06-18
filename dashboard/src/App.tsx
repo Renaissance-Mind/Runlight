@@ -29,6 +29,11 @@ import {
 } from "./api/preferences";
 import type { Session } from "./types/session";
 
+interface ToolbarAction {
+  label: string;
+  onClick: () => void;
+}
+
 function dashboardNavLinkClass({ isActive }: { isActive: boolean }): string {
   return `text-xs px-2 py-1 rounded transition-colors ${
     isActive
@@ -61,7 +66,21 @@ function LogoMark({ home }: { home: boolean }) {
   );
 }
 
-function AppHeader({ home }: { home: boolean }) {
+function AppHeader({
+  home,
+  probe,
+  loggedInWithCookie,
+  loggingOut,
+  onLogout,
+  refreshAction,
+}: {
+  home: boolean;
+  probe?: ServerConnectionProbe | null;
+  loggedInWithCookie?: boolean;
+  loggingOut?: boolean;
+  onLogout?: () => void;
+  refreshAction?: ToolbarAction | null;
+}) {
   if (home) {
     return (
       <header className="sticky top-0 z-20 border-b border-[#d7e0ea] bg-[#f8fafc]/95 px-5 py-3 font-sans backdrop-blur sm:px-8">
@@ -96,13 +115,13 @@ function AppHeader({ home }: { home: boolean }) {
   }
 
   return (
-    <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
+    <header className="border-b border-surface-3 px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-2 text-sm font-bold text-white tracking-tight">
           <LogoMark home={false} />
           Runlight
         </Link>
-        <nav className="flex items-center gap-1">
+        <nav className="flex min-w-0 flex-1 items-center gap-1">
           <NavLink to="/live" className={dashboardNavLinkClass}>
             Live
           </NavLink>
@@ -113,11 +132,35 @@ function AppHeader({ home }: { home: boolean }) {
             Devices
           </NavLink>
         </nav>
-      </div>
-      <div className="flex items-center gap-3">
-        <NavLink to="/connect" className={dashboardNavLinkClass}>
-          Connect
-        </NavLink>
+        <div className="ml-auto flex items-center gap-2">
+          {probe !== undefined ? <ConnectionStatus probe={probe} /> : null}
+          <NavLink to="/connect" className={dashboardNavLinkClass}>
+            Connect
+          </NavLink>
+          <Link
+            to="/settings"
+            className="text-xs text-gray-500 hover:text-white dark:hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
+          >
+            Settings
+          </Link>
+          {refreshAction ? (
+            <button
+              onClick={refreshAction.onClick}
+              className="text-xs text-gray-500 hover:text-white dark:hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
+            >
+              {refreshAction.label}
+            </button>
+          ) : null}
+          {loggedInWithCookie ? (
+            <button
+              onClick={onLogout}
+              disabled={loggingOut}
+              className="text-xs text-gray-500 hover:text-white dark:hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2 disabled:opacity-50"
+            >
+              {loggingOut ? "Logging out" : "Logout"}
+            </button>
+          ) : null}
+        </div>
       </div>
     </header>
   );
@@ -153,29 +196,25 @@ function filterSessions(sessions: Session[], prefs: DashboardPreferences): Sessi
   });
 }
 
-function Dashboard({ config, prefs }: { config: DashboardConnectionConfig; prefs: DashboardPreferences }) {
+function Dashboard({
+  config,
+  prefs,
+  onRefreshActionChange,
+}: {
+  config: DashboardConnectionConfig;
+  prefs: DashboardPreferences;
+  onRefreshActionChange: (action: ToolbarAction | null) => void;
+}) {
   const { sessions, loading, error, refresh } = useLiveSessions(config, 3000);
   const filtered = useMemo(() => filterSessions(sessions, prefs), [sessions, prefs]);
 
+  useEffect(() => {
+    onRefreshActionChange({ label: "Refresh", onClick: refresh });
+    return () => onRefreshActionChange(null);
+  }, [onRefreshActionChange, refresh]);
+
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-surface-3 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold text-white tracking-tight">
-            Runlight
-          </h1>
-          <span className="text-[10px] text-gray-600 uppercase">
-            Live Sessions
-          </span>
-        </div>
-        <button
-          onClick={refresh}
-          className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
-        >
-          Refresh
-        </button>
-      </header>
-
       <div className="px-4 py-3">
         <FloatingHUD sessions={filtered} />
       </div>
@@ -242,6 +281,7 @@ export default function App() {
   const [prefs, setPrefs] = useState(readPreferences);
   const { probe } = useServerConnection(config, 10000);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [refreshAction, setRefreshAction] = useState<ToolbarAction | null>(null);
 
   const saveConfig = (next: DashboardConnectionConfig) => {
     writeStoredDashboardConfig(next);
@@ -288,7 +328,9 @@ export default function App() {
 
   const authRequired = probe?.error?.startsWith("API 401") && !config.token.trim();
   const isHome = location.pathname === "/";
-  const loggedInWithCookie = probe?.ok && !config.token.trim() && probe.userId && probe.userId !== "default";
+  const loggedInWithCookie = Boolean(
+    probe?.ok && !config.token.trim() && probe.userId && probe.userId !== "default",
+  );
 
   if (authRequired && !isHome) {
     const isConnect = location.pathname === "/connect";
@@ -310,32 +352,45 @@ export default function App() {
 
   return (
     <>
-      <AppHeader home={isHome} />
-      {!isHome ? (
-        <div className="border-b border-surface-3 px-4 py-2 flex items-center justify-end gap-3">
-          <ConnectionStatus probe={probe} />
-          {loggedInWithCookie ? (
-            <button
-              onClick={doLogout}
-              disabled={loggingOut}
-              className="text-xs text-gray-500 hover:text-white dark:hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2 disabled:opacity-50"
-            >
-              {loggingOut ? "Logging out" : "Logout"}
-            </button>
-          ) : null}
-          <Link
-            to="/settings"
-            className="text-xs text-gray-500 hover:text-white dark:hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-2"
-          >
-            Settings
-          </Link>
-        </div>
-      ) : null}
+      <AppHeader
+        home={isHome}
+        probe={isHome ? undefined : probe}
+        loggedInWithCookie={loggedInWithCookie}
+        loggingOut={loggingOut}
+        onLogout={doLogout}
+        refreshAction={isHome ? null : refreshAction}
+      />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/live" element={<Dashboard config={config} prefs={prefs} />} />
-        <Route path="/messages" element={<MessagesPage config={config} prefs={prefs} />} />
-        <Route path="/devices" element={<DevicePage config={config} />} />
+        <Route
+          path="/live"
+          element={
+            <Dashboard
+              config={config}
+              prefs={prefs}
+              onRefreshActionChange={setRefreshAction}
+            />
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <MessagesPage
+              config={config}
+              prefs={prefs}
+              onRefreshActionChange={setRefreshAction}
+            />
+          }
+        />
+        <Route
+          path="/devices"
+          element={
+            <DevicePage
+              config={config}
+              onRefreshActionChange={setRefreshAction}
+            />
+          }
+        />
         <Route path="/connect" element={<ConnectPage config={config} />} />
         <Route
           path="/sessions/:sessionId"
