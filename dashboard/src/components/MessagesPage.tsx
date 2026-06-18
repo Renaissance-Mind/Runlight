@@ -85,6 +85,9 @@ function LiveRow({ session: s }: { session: Session }) {
           {formatCompactRelativeTime(timeRef)}
         </span>
       </span>
+      <span className="flex shrink-0 items-center">
+        <AgentIcon agentType={s.agent_type} />
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {s.workspace_project_name && (
@@ -92,7 +95,6 @@ function LiveRow({ session: s }: { session: Session }) {
               {s.workspace_project_name}
             </span>
           )}
-          <span className="shrink-0 flex items-center"><AgentIcon agentType={s.agent_type} /></span>
           <span className="truncate text-sm text-white">{title}</span>
         </div>
       </div>
@@ -120,6 +122,9 @@ function EventRow({ event }: { event: SessionEvent }) {
           {formatCompactRelativeTime(event.event_time)}
         </span>
       </span>
+      <span className="flex shrink-0 items-center">
+        <AgentIcon agentType={event.agent_type} />
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {event.workspace_project_name && (
@@ -127,7 +132,6 @@ function EventRow({ event }: { event: SessionEvent }) {
               {event.workspace_project_name}
             </span>
           )}
-          <span className="shrink-0 flex items-center"><AgentIcon agentType={event.agent_type} /></span>
           <span className="truncate text-sm text-white">{title}</span>
         </div>
       </div>
