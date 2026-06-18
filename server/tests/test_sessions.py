@@ -163,6 +163,50 @@ class TestSessionQueries:
         assert "sess-all-1" in ids
         assert "sess-all-2" in ids
 
+    async def test_list_devices(self, client):
+        await client.post(
+            "/api/events",
+            json=_make_event(
+                session_id="sess-device-old",
+                event_type="session.completed",
+                event_time="2026-06-18T08:00:00+00:00",
+                machine={
+                    "hostname": "studio-mac",
+                    "os": "darwin",
+                    "arch": "arm64",
+                    "user": "chunqiu",
+                    "machine_id": "machine-1",
+                },
+            ),
+        )
+        await client.post(
+            "/api/events",
+            json=_make_event(
+                session_id="sess-device-live",
+                event_type="session.heartbeat",
+                event_time="2026-06-18T08:05:00+00:00",
+                machine={
+                    "hostname": "studio-mac-renamed",
+                    "os": "darwin",
+                    "arch": "arm64",
+                    "user": "chunqiu",
+                    "machine_id": "machine-1",
+                },
+            ),
+        )
+
+        resp = await client.get("/api/devices")
+
+        assert resp.status_code == 200
+        devices = resp.json()["devices"]
+        assert len(devices) == 1
+        assert devices[0]["device_key"] == "id:machine-1"
+        assert devices[0]["device_name"] == "studio-mac-renamed"
+        assert devices[0]["last_connected_at"].startswith("2026-06-18T08:05:00")
+        assert devices[0]["latest_session_id"] == "sess-device-live"
+        assert devices[0]["open_session_count"] == 1
+        assert devices[0]["session_count"] == 2
+
     async def test_filter_by_status(self, client):
         await client.post("/api/events", json=_make_event(session_id="sess-f1"))
         await client.post("/api/events", json=_make_event(

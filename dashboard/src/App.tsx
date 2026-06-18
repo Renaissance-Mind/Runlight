@@ -8,6 +8,7 @@ import SessionDetail from "./components/SessionDetail";
 import FloatingHUD from "./components/FloatingHUD";
 import SettingsPage from "./components/SettingsPage";
 import MessagesPage from "./components/MessagesPage";
+import DevicePage from "./components/DevicePage";
 import ConnectPage from "./components/ConnectPage";
 import {
   buildAuthLoginUrl,
@@ -107,6 +108,9 @@ function AppHeader({ home }: { home: boolean }) {
           </NavLink>
           <NavLink to="/messages" className={dashboardNavLinkClass}>
             Messages
+          </NavLink>
+          <NavLink to="/devices" className={dashboardNavLinkClass}>
+            Devices
           </NavLink>
         </nav>
       </div>
@@ -331,6 +335,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/live" element={<Dashboard config={config} prefs={prefs} />} />
         <Route path="/messages" element={<MessagesPage config={config} prefs={prefs} />} />
+        <Route path="/devices" element={<DevicePage config={config} />} />
         <Route path="/connect" element={<ConnectPage config={config} />} />
         <Route
           path="/sessions/:sessionId"

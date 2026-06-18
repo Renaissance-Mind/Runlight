@@ -17,6 +17,7 @@ from runlight.services.event_service import (
 from runlight.services.session_service import (
     delete_session,
     get_all_sessions,
+    get_devices,
     get_live_sessions,
     get_session_by_id,
     refresh_session_statuses,
@@ -103,6 +104,15 @@ async def list_sessions(
     await _refresh_statuses(db, user_id)
     sessions = await get_all_sessions(db, user_id, agent_type, status, limit, offset)
     return {"sessions": [_session_dict(s) for s in sessions]}
+
+
+@router.get("/devices")
+async def list_devices(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(resolve_user),
+):
+    await _refresh_statuses(db, user_id)
+    return {"devices": await get_devices(db, user_id)}
 
 
 @router.get("/events/recent")

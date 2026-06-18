@@ -4,7 +4,7 @@ import {
   type DashboardConnectionConfig,
   resolveDashboardConfig,
 } from "./config.ts";
-import type { Session, SessionEvent } from "../types/session.ts";
+import type { DeviceRecord, Session, SessionEvent } from "../types/session.ts";
 
 async function fetchJSON<T>(
   config: DashboardConnectionConfig,
@@ -137,6 +137,13 @@ export async function fetchRecentEvents(
     `/events/recent?limit=${limit}`,
   );
   return data.events;
+}
+
+export async function fetchDevices(
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<DeviceRecord[]> {
+  const data = await fetchJSON<{ devices: DeviceRecord[] }>(config, "/devices");
+  return data.devices;
 }
 
 export async function deleteSession(

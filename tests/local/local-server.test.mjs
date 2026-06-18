@@ -73,6 +73,14 @@ describe("embedded local server", () => {
     assert.equal(recent.events.length, 1);
     assert.equal(recent.events[0].session_id, "sess-local");
     assert.deepEqual(recent.events[0].payload, { ok: true });
+
+    const devices = await (await fetch(`${baseUrl}/api/devices`)).json();
+    assert.equal(devices.devices.length, 1);
+    assert.equal(devices.devices[0].device_key, "id:local-machine-1");
+    assert.equal(devices.devices[0].device_name, "local-mac");
+    assert.equal(devices.devices[0].last_connected_at, sessions.sessions[0].last_event_at);
+    assert.equal(devices.devices[0].open_session_count, 1);
+    assert.equal(devices.devices[0].session_count, 1);
   });
 
   it("stores user settings per bearer token user", async () => {

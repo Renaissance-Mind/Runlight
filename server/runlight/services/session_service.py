@@ -23,6 +23,57 @@ RUNNING_STATUSES = {
     "waiting_user",
     "waiting_external",
 }
+TERMINAL_STATUSES = {"completed", "failed", "aborted"}
+
+
+def _clean(value: str | None) -> str | None:
+    cleaned = value.strip() if value else None
+    return cleaned or None
+
+
+def _time_value(value: datetime | None) -> float:
+    return value.timestamp() if value else 0
+
+
+def _latest_datetime(*values: datetime | None) -> datetime | None:
+    present = [value for value in values if value is not None]
+    return max(present, key=_time_value) if present else None
+
+
+def _earliest_datetime(*values: datetime | None) -> datetime | None:
+    present = [value for value in values if value is not None]
+    return min(present, key=_time_value) if present else None
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _device_key(session: Session) -> str:
+    machine_id = _clean(session.machine_id)
+    if machine_id:
+        return f"id:{machine_id}"
+    hostname = _clean(session.machine_hostname)
+    if hostname:
+        return f"host:{hostname}"
+    return "unknown"
+
+
+def _device_name(session: Session) -> str:
+    return (
+        _clean(session.machine_hostname)
+        or _clean(session.machine_id)
+        or "Unknown device"
+    )
+
+
+def _device_meta(session: Session) -> str | None:
+    parts = [
+        part
+        for part in (_clean(session.machine_os), _clean(session.machine_user))
+        if part
+    ]
+    return " / ".join(parts) if parts else None
 
 
 async def upsert_session(db: AsyncSession, envelope: EventEnvelope, user_id: str) -> Session:
@@ -164,6 +215,93 @@ async def get_all_sessions(
     query = query.order_by(Session.started_at.desc()).limit(limit).offset(offset)
     result = await db.execute(query)
     return list(result.scalars().all())
+
+
+async def get_devices(db: AsyncSession, user_id: str) -> list[dict]:
+    result = await db.execute(
+        select(Session).where(Session.user_id == user_id)
+    )
+
+    devices: dict[str, dict] = {}
+    for session in result.scalars().all():
+        key = _device_key(session)
+        row_last_connected = _latest_datetime(
+            session.last_heartbeat_at,
+            session.last_event_at,
+            session.started_at,
+        )
+        row_first_seen = _earliest_datetime(
+            session.started_at,
+            session.last_event_at,
+            session.last_heartbeat_at,
+        )
+        open_increment = 0 if session.current_status in TERMINAL_STATUSES else 1
+        existing = devices.get(key)
+
+        if existing is None:
+            devices[key] = {
+                "device_key": key,
+                "device_name": _device_name(session),
+                "device_meta": _device_meta(session),
+                "machine_hostname": _clean(session.machine_hostname),
+                "machine_os": _clean(session.machine_os),
+                "machine_arch": _clean(session.machine_arch),
+                "machine_user": _clean(session.machine_user),
+                "machine_id": _clean(session.machine_id),
+                "first_seen_at": row_first_seen,
+                "last_connected_at": row_last_connected,
+                "last_event_at": session.last_event_at,
+                "last_heartbeat_at": session.last_heartbeat_at,
+                "latest_session_id": session.session_id,
+                "latest_session_status": session.current_status,
+                "open_session_count": open_increment,
+                "session_count": 1,
+            }
+            continue
+
+        next_last_connected = _latest_datetime(
+            existing["last_connected_at"],
+            row_last_connected,
+        )
+        row_is_latest = (
+            row_last_connected is not None
+            and _time_value(row_last_connected) >= _time_value(existing["last_connected_at"])
+        )
+        if row_is_latest:
+            existing["device_name"] = _device_name(session)
+            existing["device_meta"] = _device_meta(session) or existing["device_meta"]
+            existing["machine_hostname"] = _clean(session.machine_hostname) or existing["machine_hostname"]
+            existing["machine_os"] = _clean(session.machine_os) or existing["machine_os"]
+            existing["machine_arch"] = _clean(session.machine_arch) or existing["machine_arch"]
+            existing["machine_user"] = _clean(session.machine_user) or existing["machine_user"]
+            existing["machine_id"] = _clean(session.machine_id) or existing["machine_id"]
+            existing["latest_session_id"] = session.session_id
+            existing["latest_session_status"] = session.current_status
+
+        existing["first_seen_at"] = _earliest_datetime(existing["first_seen_at"], row_first_seen)
+        existing["last_connected_at"] = next_last_connected
+        existing["last_event_at"] = _latest_datetime(existing["last_event_at"], session.last_event_at)
+        existing["last_heartbeat_at"] = _latest_datetime(existing["last_heartbeat_at"], session.last_heartbeat_at)
+        existing["open_session_count"] += open_increment
+        existing["session_count"] += 1
+
+    def serialize(device: dict) -> dict:
+        return {
+            **device,
+            "first_seen_at": _iso(device["first_seen_at"]),
+            "last_connected_at": _iso(device["last_connected_at"]),
+            "last_event_at": _iso(device["last_event_at"]),
+            "last_heartbeat_at": _iso(device["last_heartbeat_at"]),
+        }
+
+    return [
+        serialize(device)
+        for device in sorted(
+            devices.values(),
+            key=lambda item: _time_value(item["last_connected_at"]),
+            reverse=True,
+        )
+    ]
 
 
 async def get_session_by_id(db: AsyncSession, session_id: str) -> Session | None:

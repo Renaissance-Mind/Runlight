@@ -8,6 +8,7 @@ import {
   deleteUploadToken,
   completeCliConnect,
   fetchCurrentUser,
+  fetchDevices,
   fetchUploadTokens,
   fetchUserSettings,
   probeServerConnection,
@@ -36,6 +37,32 @@ const server = createServer((req, res) => {
 
   if (req.url === "/api/users/current") {
     res.end(JSON.stringify({ user_id: lastAuthorization ? "user-alice" : "default" }));
+    return;
+  }
+
+  if (req.url === "/api/devices") {
+    res.end(JSON.stringify({
+      devices: [
+        {
+          device_key: "id:machine-1",
+          device_name: "studio-mac",
+          device_meta: "darwin / chunqiu",
+          machine_hostname: "studio-mac",
+          machine_os: "darwin",
+          machine_arch: "arm64",
+          machine_user: "chunqiu",
+          machine_id: "machine-1",
+          first_seen_at: "2026-06-18T08:00:00.000Z",
+          last_connected_at: "2026-06-18T08:05:00.000Z",
+          last_event_at: "2026-06-18T08:04:00.000Z",
+          last_heartbeat_at: "2026-06-18T08:05:00.000Z",
+          latest_session_id: "sess-1",
+          latest_session_status: "running",
+          open_session_count: 1,
+          session_count: 3,
+        },
+      ],
+    }));
     return;
   }
 
@@ -176,6 +203,16 @@ describe("dashboard runtime API client", () => {
     assert.equal(probe.tokenConfigured, false);
     assert.equal(typeof probe.checkedAt, "string");
     assert.equal(probe.error, null);
+  });
+
+  it("fetches connected devices from the configured server", async () => {
+    const devices = await fetchDevices({ serverUrl, token: "tok-user-1" });
+
+    assert.equal(devices.length, 1);
+    assert.equal(devices[0].device_name, "studio-mac");
+    assert.equal(devices[0].last_connected_at, "2026-06-18T08:05:00.000Z");
+    assert.equal(devices[0].open_session_count, 1);
+    assert.equal(lastAuthorization, "Bearer tok-user-1");
   });
 
   it("reports HTML responses as server URL mistakes instead of JSON parser errors", async () => {

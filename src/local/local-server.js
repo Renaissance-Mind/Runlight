@@ -281,6 +281,102 @@ function sortDescByTime(a, b) {
   return parseUTC(b.last_event_at || b.event_time || "") - parseUTC(a.last_event_at || a.event_time || "");
 }
 
+function latestIso(...values) {
+  return values.filter(Boolean).reduce((latest, value) => {
+    if (!latest) return value;
+    return parseUTC(value) > parseUTC(latest) ? value : latest;
+  }, null);
+}
+
+function earliestIso(...values) {
+  return values.filter(Boolean).reduce((earliest, value) => {
+    if (!earliest) return value;
+    return parseUTC(value) < parseUTC(earliest) ? value : earliest;
+  }, null);
+}
+
+function cleanLabel(value) {
+  const cleaned = String(value || "").trim();
+  return cleaned || null;
+}
+
+function sessionDeviceKey(session) {
+  const machineId = cleanLabel(session.machine_id);
+  if (machineId) return `id:${machineId}`;
+  const hostname = cleanLabel(session.machine_hostname);
+  if (hostname) return `host:${hostname}`;
+  return "unknown";
+}
+
+function sessionDeviceName(session) {
+  return cleanLabel(session.machine_hostname) || cleanLabel(session.machine_id) || "Unknown device";
+}
+
+function sessionDeviceMeta(session) {
+  const parts = [cleanLabel(session.machine_os), cleanLabel(session.machine_user)].filter(Boolean);
+  return parts.length > 0 ? parts.join(" / ") : null;
+}
+
+function summarizeDevices(sessions) {
+  const devices = new Map();
+
+  for (const session of sessions) {
+    const key = sessionDeviceKey(session);
+    const rowLastConnected = latestIso(session.last_heartbeat_at, session.last_event_at, session.started_at);
+    const rowFirstSeen = earliestIso(session.started_at, session.last_event_at, session.last_heartbeat_at);
+    const existing = devices.get(key);
+    const openIncrement = ["completed", "failed", "aborted"].includes(session.current_status) ? 0 : 1;
+
+    if (!existing) {
+      devices.set(key, {
+        device_key: key,
+        device_name: sessionDeviceName(session),
+        device_meta: sessionDeviceMeta(session),
+        machine_hostname: cleanLabel(session.machine_hostname),
+        machine_os: cleanLabel(session.machine_os),
+        machine_arch: cleanLabel(session.machine_arch),
+        machine_user: cleanLabel(session.machine_user),
+        machine_id: cleanLabel(session.machine_id),
+        first_seen_at: rowFirstSeen,
+        last_connected_at: rowLastConnected,
+        last_event_at: session.last_event_at,
+        last_heartbeat_at: session.last_heartbeat_at,
+        latest_session_id: session.session_id,
+        latest_session_status: session.current_status,
+        open_session_count: openIncrement,
+        session_count: 1,
+      });
+      continue;
+    }
+
+    const nextLastConnected = latestIso(existing.last_connected_at, rowLastConnected);
+    const rowIsLatest = rowLastConnected && nextLastConnected === rowLastConnected;
+    const latestIdentity = rowIsLatest ? session : null;
+    devices.set(key, {
+      ...existing,
+      device_name: latestIdentity ? sessionDeviceName(latestIdentity) : existing.device_name,
+      device_meta: latestIdentity ? sessionDeviceMeta(latestIdentity) || existing.device_meta : existing.device_meta,
+      machine_hostname: latestIdentity ? cleanLabel(latestIdentity.machine_hostname) || existing.machine_hostname : existing.machine_hostname,
+      machine_os: latestIdentity ? cleanLabel(latestIdentity.machine_os) || existing.machine_os : existing.machine_os,
+      machine_arch: latestIdentity ? cleanLabel(latestIdentity.machine_arch) || existing.machine_arch : existing.machine_arch,
+      machine_user: latestIdentity ? cleanLabel(latestIdentity.machine_user) || existing.machine_user : existing.machine_user,
+      machine_id: latestIdentity ? cleanLabel(latestIdentity.machine_id) || existing.machine_id : existing.machine_id,
+      first_seen_at: earliestIso(existing.first_seen_at, rowFirstSeen),
+      last_connected_at: nextLastConnected,
+      last_event_at: latestIso(existing.last_event_at, session.last_event_at),
+      last_heartbeat_at: latestIso(existing.last_heartbeat_at, session.last_heartbeat_at),
+      latest_session_id: rowIsLatest ? session.session_id : existing.latest_session_id,
+      latest_session_status: rowIsLatest ? session.current_status : existing.latest_session_status,
+      open_session_count: existing.open_session_count + openIncrement,
+      session_count: existing.session_count + 1,
+    });
+  }
+
+  return Array.from(devices.values()).sort(
+    (a, b) => parseUTC(b.last_connected_at || "") - parseUTC(a.last_connected_at || ""),
+  );
+}
+
 function tokenPreview(token) {
   if (token.length <= 16) return token;
   return `${token.slice(0, 11)}...${token.slice(-4)}`;
@@ -346,6 +442,14 @@ export async function createLocalServer({
         .sort(sortDescByTime)
         .map(sessionToJson);
       jsonResponse(req, res, 200, { sessions });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/devices") {
+      const devices = summarizeDevices(
+        Object.values(store.sessions).filter((session) => session.user_id === userId),
+      );
+      jsonResponse(req, res, 200, { devices });
       return;
     }
 

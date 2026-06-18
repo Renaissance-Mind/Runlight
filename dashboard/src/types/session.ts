@@ -44,6 +44,25 @@ export interface SessionEvent {
   payload: Record<string, unknown> | null;
 }
 
+export interface DeviceRecord {
+  device_key: string;
+  device_name: string;
+  device_meta: string | null;
+  machine_hostname: string | null;
+  machine_os: string | null;
+  machine_arch: string | null;
+  machine_user: string | null;
+  machine_id: string | null;
+  first_seen_at: string | null;
+  last_connected_at: string | null;
+  last_event_at: string | null;
+  last_heartbeat_at: string | null;
+  latest_session_id: string | null;
+  latest_session_status: string | null;
+  open_session_count: number;
+  session_count: number;
+}
+
 export type SessionStatus =
   | "starting"
   | "running"

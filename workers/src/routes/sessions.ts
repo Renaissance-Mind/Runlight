@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env, SessionRow } from "../types";
 import { resolveRequestUser } from "../auth";
 import { inferStatus } from "../status";
+import { summarizeDeviceRows, type DeviceSessionRow } from "../devices";
 
 export const sessions = new Hono<{ Bindings: Env }>();
 
@@ -150,6 +151,28 @@ sessions.get("/sessions/live", async (c) => {
     .all<SessionRow>();
 
   return c.json({ sessions: (result.results || []).map(sessionToJson) });
+});
+
+sessions.get("/devices", async (c) => {
+  let userId: string;
+  try {
+    userId = await resolveRequestUser(c.env, c.req.raw);
+  } catch {
+    return c.json({ detail: "Authentication required" }, 401);
+  }
+
+  await refreshStatuses(c.env.DB, userId, staleSeconds(c.env));
+
+  const result = await c.env.DB.prepare(
+    `SELECT session_id, machine_hostname, machine_os, machine_arch, machine_user, machine_id,
+            current_status, started_at, last_event_at, last_heartbeat_at
+     FROM sessions
+     WHERE user_id = ?`,
+  )
+    .bind(userId)
+    .all<DeviceSessionRow>();
+
+  return c.json({ devices: summarizeDeviceRows(result.results || []) });
 });
 
 sessions.get("/sessions", async (c) => {
