@@ -19,15 +19,27 @@ describe("worker status inference", () => {
     assert.equal(inferStatus("command.finished", null, null, secondsAgo(300), 120), "finished");
   });
 
-  it("keeps an active run running after an individual tool completes", () => {
-    const activeRunStartedAt = secondsAgo(600);
+  it("keeps a recent active run running after an individual tool completes", () => {
+    const activeRunStartedAt = secondsAgo(60);
     assert.equal(
-      inferStatus("tool.finished", null, null, secondsAgo(300), 120, activeRunStartedAt),
+      inferStatus("tool.finished", null, null, secondsAgo(30), 120, activeRunStartedAt),
       "running",
     );
     assert.equal(
-      inferStatus("command.finished", null, null, secondsAgo(300), 120, activeRunStartedAt),
+      inferStatus("command.finished", null, null, secondsAgo(30), 120, activeRunStartedAt),
       "running",
+    );
+  });
+
+  it("marks quiet active runs stale even after an individual tool completes", () => {
+    const activeRunStartedAt = secondsAgo(600);
+    assert.equal(
+      inferStatus("tool.finished", null, null, secondsAgo(300), 120, activeRunStartedAt),
+      "stale",
+    );
+    assert.equal(
+      inferStatus("command.finished", null, null, secondsAgo(300), 120, activeRunStartedAt),
+      "stale",
     );
   });
 

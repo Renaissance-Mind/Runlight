@@ -111,7 +111,7 @@ describe("embedded local server", () => {
     assert.match(user.user_id, /^token:/);
   });
 
-  it("keeps an open turn running after a tool finishes", async () => {
+  it("keeps a recent open turn running after a tool finishes", async () => {
     const env = { ...process.env, RUNLIGHT_HOME: await tempHome() };
     const local = await createLocalServer({ env, host: "127.0.0.1", port: 0 });
     servers.push(() => local.close());
@@ -119,11 +119,11 @@ describe("embedded local server", () => {
 
     const started = {
       ...event("sess-active-local", "message.started"),
-      event_time: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      event_time: new Date(Date.now() - 60 * 1000).toISOString(),
     };
     const toolFinished = {
       ...event("sess-active-local", "tool.finished"),
-      event_time: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      event_time: new Date(Date.now() - 30 * 1000).toISOString(),
     };
 
     const ingest = await fetch(`${baseUrl}/api/events`, {
@@ -135,6 +135,34 @@ describe("embedded local server", () => {
 
     const session = await (await fetch(`${baseUrl}/api/sessions/sess-active-local`)).json();
     assert.equal(session.current_status, "running");
+    assert.equal(session.active_run_started_at, started.event_time);
+    assert.equal(session.current_run_started_at, started.event_time);
+  });
+
+  it("marks a quiet open turn stale after a tool finishes", async () => {
+    const env = { ...process.env, RUNLIGHT_HOME: await tempHome() };
+    const local = await createLocalServer({ env, host: "127.0.0.1", port: 0 });
+    servers.push(() => local.close());
+    const baseUrl = `http://127.0.0.1:${local.server.address().port}`;
+
+    const started = {
+      ...event("sess-stale-active-local", "message.started"),
+      event_time: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    };
+    const toolFinished = {
+      ...event("sess-stale-active-local", "tool.finished"),
+      event_time: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    };
+
+    const ingest = await fetch(`${baseUrl}/api/events`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ events: [started, toolFinished] }),
+    });
+    assert.equal(ingest.status, 200);
+
+    const session = await (await fetch(`${baseUrl}/api/sessions/sess-stale-active-local`)).json();
+    assert.equal(session.current_status, "stale");
     assert.equal(session.active_run_started_at, started.event_time);
     assert.equal(session.current_run_started_at, started.event_time);
   });

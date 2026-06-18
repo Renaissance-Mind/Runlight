@@ -96,7 +96,7 @@ class TestSessionQueries:
         session = await db_session.get(Session, 1)
         assert session.current_status == "stale"
 
-    async def test_refresh_session_statuses_keeps_open_turn_running_after_tool_finish(
+    async def test_refresh_session_statuses_marks_quiet_open_turn_stale_after_tool_finish(
         self, db_session
     ):
         old = datetime.now(timezone.utc) - timedelta(seconds=300)
@@ -111,6 +111,33 @@ class TestSessionQueries:
                 started_at=old,
                 last_event_at=old,
                 active_run_started_at=old,
+                event_count=2,
+            )
+        )
+        await db_session.commit()
+
+        changed = await refresh_session_statuses(db_session, "default")
+
+        assert changed is True
+        session = await db_session.get(Session, 1)
+        assert session.current_status == "stale"
+
+    async def test_refresh_session_statuses_keeps_recent_open_turn_running_after_tool_finish(
+        self, db_session
+    ):
+        recent = datetime.now(timezone.utc) - timedelta(seconds=30)
+        active = datetime.now(timezone.utc) - timedelta(seconds=60)
+        db_session.add(
+            Session(
+                session_id="sess-recent-open-turn",
+                user_id="default",
+                agent_type="codex",
+                adapter_name="codex-hook",
+                current_status="running",
+                latest_event_type="tool.finished",
+                started_at=active,
+                last_event_at=recent,
+                active_run_started_at=active,
                 event_count=2,
             )
         )

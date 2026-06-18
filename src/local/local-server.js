@@ -53,19 +53,21 @@ function inferStatus(
   if (latestEventType === "external.waiting") return "waiting_external";
   if (latestEventType === "message.finished") return "finished";
 
+  const staleRef = lastHeartbeatAt || lastEventAt || activeRunStartedAt;
+  if (staleRef) {
+    const age = (Date.now() - parseUTC(staleRef)) / 1000;
+    if (age > heartbeatStaleSeconds) {
+      const isMidFlight =
+        lastHeartbeatAt || activeRunStartedAt || String(latestEventType || "").endsWith(".started");
+      if (isMidFlight) return "stale";
+      return "finished";
+    }
+  }
+
   if (activeRunStartedAt && !lastHeartbeatAt) {
     if (latestEventType === "command.started") return "command_running";
     if (latestEventType === "tool.started") return "tool_running";
     return "running";
-  }
-
-  const staleRef = lastHeartbeatAt || lastEventAt;
-  if (staleRef) {
-    const age = (Date.now() - parseUTC(staleRef)) / 1000;
-    if (age > heartbeatStaleSeconds) {
-      if (lastHeartbeatAt || String(latestEventType || "").endsWith(".started")) return "stale";
-      return "finished";
-    }
   }
 
   if (latestEventType === "session.started" && !lastHeartbeatAt) return "starting";

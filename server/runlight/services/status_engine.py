@@ -55,27 +55,32 @@ def infer_status(
     if latest_event_type == "message.finished":
         return "finished"
 
+    stale_reference = last_heartbeat_at or last_event_at or active_run_started_at
+    if stale_reference:
+        age = (datetime.now(timezone.utc) - _as_utc(stale_reference)).total_seconds()
+        if age > settings.heartbeat_stale_seconds:
+            # "stale" means an agent stopped responding mid-flight. When
+            # heartbeats are being sent, a gap proves that. Without heartbeats,
+            # an active run is also mid-flight; sessions outside an active run
+            # are stale only when the last event was a started event that never
+            # completed.
+            is_mid_flight = (
+                last_heartbeat_at is not None
+                or active_run_started_at is not None
+                or bool(
+                    latest_event_type and latest_event_type.endswith(".started")
+                )
+            )
+            if is_mid_flight:
+                return "stale"
+            return "finished"
+
     if active_run_started_at is not None and last_heartbeat_at is None:
         if latest_event_type == "command.started":
             return "command_running"
         if latest_event_type == "tool.started":
             return "tool_running"
         return "running"
-
-    stale_reference = last_heartbeat_at or last_event_at
-    if stale_reference:
-        age = (datetime.now(timezone.utc) - _as_utc(stale_reference)).total_seconds()
-        if age > settings.heartbeat_stale_seconds:
-            # "stale" means an agent stopped responding mid-flight. When
-            # heartbeats are being sent, a gap proves that. Without heartbeats
-            # we infer from the last event: an action that started but never
-            # completed looks stuck (stale); a completed action means the turn
-            # ended cleanly and the session is just idle (finished).
-            if last_heartbeat_at is not None or (
-                latest_event_type and latest_event_type.endswith(".started")
-            ):
-                return "stale"
-            return "finished"
 
     if active_started_types:
         if any("command" in t for t in active_started_types):

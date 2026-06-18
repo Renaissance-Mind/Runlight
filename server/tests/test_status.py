@@ -33,16 +33,28 @@ class TestStatusEngine:
         assert infer_status("tool.finished", None, last_event_at=old) == "finished"
         assert infer_status("command.finished", None, last_event_at=old) == "finished"
 
-    def test_completed_action_inside_active_run_stays_running(self):
+    def test_recent_completed_action_inside_active_run_stays_running(self):
+        recent = datetime.now(timezone.utc) - timedelta(seconds=30)
+        active = datetime.now(timezone.utc) - timedelta(seconds=60)
+        assert (
+            infer_status("tool.finished", None, last_event_at=recent, active_run_started_at=active)
+            == "running"
+        )
+        assert (
+            infer_status("command.finished", None, last_event_at=recent, active_run_started_at=active)
+            == "running"
+        )
+
+    def test_quiet_completed_action_inside_active_run_becomes_stale(self):
         old = datetime.now(timezone.utc) - timedelta(seconds=300)
         active = datetime.now(timezone.utc) - timedelta(seconds=600)
         assert (
             infer_status("tool.finished", None, last_event_at=old, active_run_started_at=active)
-            == "running"
+            == "stale"
         )
         assert (
             infer_status("command.finished", None, last_event_at=old, active_run_started_at=active)
-            == "running"
+            == "stale"
         )
 
     def test_started_action_quiet_is_stale(self):

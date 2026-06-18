@@ -81,25 +81,28 @@ export function inferStatus(
   if (latestEventType === "permission.requested") return "waiting_user";
   if (latestEventType === "message.finished") return "finished";
 
-  if (activeRunStartedAt && !lastHeartbeatAt) {
-    if (latestEventType === "command.started") return "command_running";
-    if (latestEventType === "tool.started") return "tool_running";
-    return "running";
-  }
-
-  const staleRef = lastHeartbeatAt || lastEventAt;
+  const staleRef = lastHeartbeatAt || lastEventAt || activeRunStartedAt;
   if (staleRef) {
     const age = (Date.now() - parseUTC(staleRef)) / 1000;
     if (age > heartbeatStaleSeconds) {
       // "stale" means an agent stopped responding mid-flight. With heartbeats
-      // a gap proves that; without them, infer from the last event: a started
-      // action that never completed looks stuck (stale), while a completed
-      // action means the turn ended cleanly and the session is idle (finished).
-      if (lastHeartbeatAt || (latestEventType && latestEventType.endsWith(".started"))) {
+      // a gap proves that. Without heartbeats, an active run is also mid-flight;
+      // sessions outside an active run are stale only when the last event was
+      // a started event that never completed.
+      const isMidFlight = Boolean(
+        lastHeartbeatAt || activeRunStartedAt || (latestEventType && latestEventType.endsWith(".started")),
+      );
+      if (isMidFlight) {
         return "stale";
       }
       return "finished";
     }
+  }
+
+  if (activeRunStartedAt && !lastHeartbeatAt) {
+    if (latestEventType === "command.started") return "command_running";
+    if (latestEventType === "tool.started") return "tool_running";
+    return "running";
   }
 
   if (latestEventType === "session.started" && !lastHeartbeatAt) {
