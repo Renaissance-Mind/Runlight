@@ -1,12 +1,14 @@
 import { loadConfig } from "./config.js";
 import { localDaemonUrl } from "./paths.js";
+import { isSupportedAgentSource, normalizeAgentSource } from "./agent-registry.js";
 
 export function buildRawHookEnvelope(agent, input) {
-  if (agent !== "codex" && agent !== "claude") {
+  const normalizedAgent = normalizeAgentSource(agent);
+  if (!isSupportedAgentSource(normalizedAgent)) {
     throw new Error(`Unsupported hook agent: ${agent}`);
   }
   return {
-    agent,
+    agent: normalizedAgent,
     input,
     received_at: new Date().toISOString(),
   };
@@ -27,7 +29,8 @@ export async function postHookInput(agent, rawInput, { env = process.env, fetchI
     body: JSON.stringify(rawEvent),
   });
   if (!response.ok) return { sent: false, reason: `daemon HTTP ${response.status}` };
-  return { sent: true, daemon: await response.json() };
+  const daemon = await response.json();
+  return { sent: true, daemon, hookResponse: daemon.hook_response || "" };
 }
 
 export async function readStdin(stdin = process.stdin) {

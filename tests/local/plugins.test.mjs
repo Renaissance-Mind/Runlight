@@ -3,7 +3,16 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { enableCodexHooksFeatureToml, installClaudePlugin, installCodexPlugin, pluginStatus, uninstallClaudePlugin, uninstallCodexPlugin } from "../../src/local/plugins.js";
+import {
+  enableCodexHooksFeatureToml,
+  installAgentPlugin,
+  installClaudePlugin,
+  installCodexPlugin,
+  pluginStatus,
+  SUPPORTED_PLUGIN_TARGETS,
+  uninstallClaudePlugin,
+  uninstallCodexPlugin,
+} from "../../src/local/plugins.js";
 
 async function tempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -20,6 +29,8 @@ describe("local plugin installers", () => {
     assert.equal(hooks.hooks.SessionStart[0].hooks[0].command, "node /repo/bin/runlight.js hook codex");
     assert.equal(hooks.hooks.PreToolUse[0].hooks[0].timeout, 3);
     assert.equal(hooks.hooks.PreToolUse[0].hooks[0].timeout_ms, undefined);
+    assert.equal(hooks.hooks.PermissionRequest[0].hooks[0].timeout, 86400);
+    assert.equal(hooks.hooks.PermissionRequest[0].hooks[0].async, false);
 
     const status = await pluginStatus({ env });
     assert.equal(status.codex.installed, true);
@@ -61,7 +72,7 @@ describe("local plugin installers", () => {
     );
   });
 
-  it("installs Claude hooks as async daemon CLI commands", async () => {
+  it("installs Claude hooks with a blocking approval hook", async () => {
     const dir = await tempDir("runlight-claude-home-");
     const settingsFile = path.join(dir, "settings.json");
     const env = { ...process.env, CLAUDE_SETTINGS_FILE: settingsFile };
@@ -70,7 +81,10 @@ describe("local plugin installers", () => {
     const settings = JSON.parse(await fs.readFile(result.settingsFile, "utf8"));
 
     assert.equal(settings.hooks.SessionStart[0].hooks[0].command, "runlight hook claude");
-    assert.equal(settings.hooks.SessionStart[0].hooks[0].async, true);
+    assert.equal(settings.hooks.SessionStart[0].hooks[0].async, false);
+    assert.equal(settings.hooks.PermissionRequest[0].hooks[0].command, "runlight hook claude");
+    assert.equal(settings.hooks.PermissionRequest[0].hooks[0].timeout, 86400);
+    assert.equal(settings.hooks.PermissionRequest[0].hooks[0].async, false);
 
     const status = await pluginStatus({ env });
     assert.equal(status.claude.installed, true);
@@ -78,5 +92,24 @@ describe("local plugin installers", () => {
     await uninstallClaudePlugin({ env });
     const after = JSON.parse(await fs.readFile(result.settingsFile, "utf8"));
     assert.equal(after.hooks.SessionStart, undefined);
+  });
+
+  it("exposes installers for the built-in multi-agent hook targets", async () => {
+    assert.ok(SUPPORTED_PLUGIN_TARGETS.includes("gemini"));
+    assert.ok(SUPPORTED_PLUGIN_TARGETS.includes("cursor"));
+    assert.ok(SUPPORTED_PLUGIN_TARGETS.includes("qwen"));
+    assert.ok(SUPPORTED_PLUGIN_TARGETS.includes("cline"));
+  });
+
+  it("installs a non-Claude agent hook through the shared agent installer", async () => {
+    const home = await tempDir("runlight-multi-agent-home-");
+    const env = { ...process.env, HOME: home };
+
+    const result = await installAgentPlugin("qwen", { env, command: "runlight hook qwen" });
+    const settings = JSON.parse(await fs.readFile(result.configFile, "utf8"));
+
+    assert.equal(settings.hooks.SessionStart[0].hooks[0].command, "runlight hook qwen");
+    assert.equal(settings.hooks.PermissionRequest[0].hooks[0].timeout, 86400);
+    assert.equal(settings.hooks.PermissionRequest[0].hooks[0].async, false);
   });
 });

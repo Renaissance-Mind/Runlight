@@ -63,6 +63,27 @@ export interface DeviceRecord {
   session_count: number;
 }
 
+export interface ApprovalRequest {
+  id: string;
+  status: string;
+  agent: string;
+  session_id: string;
+  session_name: string | null;
+  tool_name: string;
+  summary: string | null;
+  requested_at: string;
+  event_type: string;
+  tool_input: Record<string, unknown>;
+  workspace_cwd: string | null;
+  machine_hostname: string | null;
+}
+
+export interface ApprovalResolution {
+  id: string;
+  status: string;
+  decision: "allow" | "deny";
+}
+
 export type SessionStatus =
   | "starting"
   | "running"

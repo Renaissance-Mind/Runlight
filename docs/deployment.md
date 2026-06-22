@@ -88,7 +88,7 @@ RUNLIGHT_CORS_ORIGINS='https://dashboard.example.com'
 
 ## Configure The Local Daemon
 
-Codex and Claude hooks do not store server URL or upload tokens in hook scripts.
+Agent hooks do not store server URL or upload tokens in hook scripts.
 Install and configure the npm CLI once on each machine:
 
 ```bash
@@ -148,9 +148,9 @@ runlight-adapter heartbeat --session <id>
 runlight-adapter finish --session <id> --result completed
 ```
 
-Python clients send heartbeat, sequence, dedupe, and offline-queue metadata; the
-Codex and Claude hook commands remain fail-open and best-effort while the daemon
-handles retry.
+Python clients send heartbeat, sequence, dedupe, and offline-queue metadata;
+agent hook commands remain fail-open and best-effort while the daemon handles
+retry and local approval waits.
 
 ## Configure Worker Server
 

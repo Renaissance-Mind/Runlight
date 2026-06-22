@@ -12,7 +12,7 @@ Client  ──▶  Local daemon  ──▶  Server  ◀──  Viewer
 ```
 
 - **Client**: Adapters/plugins installed inside each agent, collecting lifecycle signals.
-- **Local daemon**: Receives raw Codex and Claude hook payloads, enriches them, queues them durably, and uploads them.
+- **Local daemon**: Receives raw agent hook payloads, enriches them, holds local approval waits when needed, queues events durably, and uploads them.
 - **Server**: Receives, stores, and queries events via a REST API.
 - **Viewer**: Displays agent activity. Multiple viewer types share the same server API.
 
@@ -27,15 +27,22 @@ Runlight daemon.
 |---|---|---|
 | Claude Code | `plugins/runlight-claude/` | `runlight plugin claude` or `install.sh` |
 | Codex CLI | `plugins/runlight-codex/` | `runlight plugin codex` or `install-codex-hook.sh` |
+| Additional hook-capable CLIs | user-level provider config | `runlight plugin <agent>` or `runlight hook <agent>` |
 
-Codex and Claude hooks share the same local contract:
-- Run `runlight hook codex` or `runlight hook claude`
+Agent hooks share the same local contract:
+- Run `runlight hook <agent>`
 - POST raw hook payloads to the daemon's authenticated `POST /events/raw`
 - Keep hosted server URL and upload token out of hook commands
 
 The daemon maps raw hook payloads into protocol events, attaches local metadata
 such as session titles, pinned state, workspace, machine, and automation hints,
 then uploads batches to the server's `POST /api/events`.
+
+For provider permission hooks, the daemon can keep the local hook request open,
+publish the pending approval through the embedded local server, and write the
+allow/deny response back to the waiting hook after the dashboard decision. The
+hosted server stores the observed waiting/resolved events but does not issue
+control commands to agents.
 
 Python and custom adapters can either upload standard protocol events directly
 to `POST /api/events` or run beside the daemon, depending on deployment needs.

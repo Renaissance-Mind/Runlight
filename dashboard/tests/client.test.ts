@@ -8,10 +8,12 @@ import {
   deleteUploadToken,
   completeCliConnect,
   fetchCurrentUser,
+  fetchApprovals,
   fetchDevices,
   fetchUploadTokens,
   fetchUserSettings,
   probeServerConnection,
+  resolveApproval,
   saveUserSettings,
 } from "../src/api/client.ts";
 
@@ -63,6 +65,30 @@ const server = createServer((req, res) => {
         },
       ],
     }));
+    return;
+  }
+
+  if (req.url === "/api/approvals" && req.method === "GET") {
+    res.end(JSON.stringify({
+      approvals: [
+        {
+          id: "appr-1",
+          session_id: "sess-approval",
+          session_name: "Deploy",
+          agent: "claude",
+          tool_name: "Bash",
+          summary: "Permission: Bash",
+          status: "pending",
+          requested_at: "2026-06-22T08:00:00.000Z",
+          tool_input: { command: "npm publish" },
+        },
+      ],
+    }));
+    return;
+  }
+
+  if (req.url === "/api/approvals/appr-1/resolve" && req.method === "POST") {
+    res.end(JSON.stringify({ id: "appr-1", status: "resolved", decision: "allow" }));
     return;
   }
 
@@ -212,6 +238,20 @@ describe("dashboard runtime API client", () => {
     assert.equal(devices[0].device_name, "studio-mac");
     assert.equal(devices[0].last_connected_at, "2026-06-18T08:05:00.000Z");
     assert.equal(devices[0].open_session_count, 1);
+    assert.equal(lastAuthorization, "Bearer tok-user-1");
+  });
+
+  it("fetches and resolves local approval requests", async () => {
+    const config = { serverUrl, token: "tok-user-1" };
+    const approvals = await fetchApprovals(config);
+
+    assert.equal(approvals.length, 1);
+    assert.equal(approvals[0].id, "appr-1");
+    assert.equal(approvals[0].tool_input?.command, "npm publish");
+
+    const result = await resolveApproval("appr-1", "allow", config);
+    assert.equal(result.status, "resolved");
+    assert.equal(result.decision, "allow");
     assert.equal(lastAuthorization, "Bearer tok-user-1");
   });
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Routes, Route, useLocation } from "react-router-dom";
-import { useLiveSessions } from "./hooks/useSessions";
+import { useApprovals, useLiveSessions } from "./hooks/useSessions";
 import { useServerConnection } from "./hooks/useServerConnection";
 import HomePage from "./components/HomePage";
 import SessionsTable from "./components/SessionsTable";
@@ -10,6 +10,7 @@ import SettingsPage from "./components/SettingsPage";
 import MessagesPage from "./components/MessagesPage";
 import DevicePage from "./components/DevicePage";
 import ConnectPage from "./components/ConnectPage";
+import ApprovalPanel from "./components/ApprovalPanel";
 import {
   buildAuthLoginUrl,
   readStoredDashboardConfig,
@@ -206,6 +207,7 @@ function Dashboard({
   onRefreshActionChange: (action: ToolbarAction | null) => void;
 }) {
   const { sessions, loading, error, refresh } = useLiveSessions(config, 3000);
+  const approvals = useApprovals(config, 2000);
   const filtered = useMemo(() => filterSessions(sessions, prefs), [sessions, prefs]);
 
   useEffect(() => {
@@ -220,6 +222,12 @@ function Dashboard({
       </div>
 
       <main className="flex-1 px-4 pb-4">
+        <ApprovalPanel
+          approvals={approvals.approvals}
+          error={approvals.error}
+          resolvingIds={approvals.resolvingIds}
+          onDecision={approvals.decide}
+        />
         <SessionsTable sessions={filtered} loading={loading} error={error} />
       </main>
 

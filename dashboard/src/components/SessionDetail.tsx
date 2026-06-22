@@ -4,6 +4,8 @@ import type { Session, SessionEvent } from "../types/session";
 import { deleteSession, fetchSession, fetchSessionEvents } from "../api/client";
 import StatusBadge from "./StatusBadge";
 import type { DashboardConnectionConfig } from "../api/config";
+import { useApprovals } from "../hooks/useSessions";
+import ApprovalPanel from "./ApprovalPanel";
 
 function formatTime(isoStr: string | null): string {
   if (!isoStr) return "-";
@@ -34,6 +36,7 @@ export default function SessionDetail({
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const approvals = useApprovals(config, 2000);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -186,6 +189,13 @@ export default function SessionDetail({
         <MetaCard label="Last Heartbeat" value={formatTime(session.last_heartbeat_at)} />
         <MetaCard label="Latest Event Type" value={session.latest_event_type} />
       </div>
+
+      <ApprovalPanel
+        approvals={approvals.approvals.filter((approval) => approval.session_id === session.session_id)}
+        error={approvals.error}
+        resolvingIds={approvals.resolvingIds}
+        onDecision={approvals.decide}
+      />
 
       <div>
         <h3 className="text-xs text-gray-500 mb-2 uppercase tracking-wider">

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { createLocalServer } from "../../src/local/local-server.js";
+import { defaultConfig, saveConfig } from "../../src/local/config.js";
 
 const servers = [];
 
@@ -13,6 +15,16 @@ after(async () => {
 
 async function tempHome() {
   return fs.mkdtemp(path.join(os.tmpdir(), "runlight-local-server-home-"));
+}
+
+function listen(server) {
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve(server.address()));
+  });
+}
+
+function closeServer(server) {
+  return new Promise((resolve) => server.close(resolve));
 }
 
 function event(sessionId, eventType = "message.finished") {
@@ -165,5 +177,63 @@ describe("embedded local server", () => {
     assert.equal(session.current_status, "stale");
     assert.equal(session.active_run_started_at, started.event_time);
     assert.equal(session.current_run_started_at, started.event_time);
+  });
+
+  it("proxies approval reads and decisions to the local daemon without exposing the local secret", async () => {
+    const seen = [];
+    const daemon = http.createServer((req, res) => {
+      seen.push({ url: req.url, secret: req.headers["x-runlight-local-secret"] });
+      res.setHeader("content-type", "application/json");
+      if (req.url === "/approvals" && req.method === "GET") {
+        res.end(JSON.stringify({
+          approvals: [
+            {
+              id: "appr-1",
+              session_id: "sess-1",
+              agent: "claude",
+              tool_name: "Bash",
+              summary: "Permission: Bash",
+              status: "pending",
+              requested_at: "2026-06-22T08:00:00.000Z",
+            },
+          ],
+        }));
+        return;
+      }
+      if (req.url === "/approvals/appr-1/resolve" && req.method === "POST") {
+        req.resume();
+        req.on("end", () => {
+          res.end(JSON.stringify({ status: "resolved", id: "appr-1", decision: "allow" }));
+        });
+        return;
+      }
+      res.statusCode = 404;
+      res.end(JSON.stringify({ detail: "not found" }));
+    });
+    const daemonAddress = await listen(daemon);
+    servers.push(() => closeServer(daemon));
+
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const config = defaultConfig(env);
+    config.local_secret = "daemon-secret";
+    config.daemon.port = daemonAddress.port;
+    await saveConfig(config, env);
+
+    const local = await createLocalServer({ env, host: "127.0.0.1", port: 0 });
+    servers.push(() => local.close());
+    const baseUrl = `http://127.0.0.1:${local.server.address().port}`;
+
+    const approvals = await (await fetch(`${baseUrl}/api/approvals`)).json();
+    assert.equal(approvals.approvals.length, 1);
+    assert.equal(approvals.approvals[0].id, "appr-1");
+
+    const resolved = await (await fetch(`${baseUrl}/api/approvals/appr-1/resolve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ decision: "allow" }),
+    })).json();
+    assert.equal(resolved.status, "resolved");
+    assert.deepEqual(seen.map((item) => item.secret), ["daemon-secret", "daemon-secret"]);
   });
 });

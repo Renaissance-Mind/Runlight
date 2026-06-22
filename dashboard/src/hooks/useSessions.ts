@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session, SessionEvent } from "../types/session";
 import {
+  fetchApprovals,
   fetchDevices,
   fetchLiveSessions,
   fetchAllSessions,
   fetchRecentEvents,
+  resolveApproval,
 } from "../api/client";
-import type { DeviceRecord } from "../types/session";
+import type { ApprovalRequest, DeviceRecord } from "../types/session";
 import type { DashboardConnectionConfig } from "../api/config";
 
 export function useLiveSessions(
@@ -98,6 +100,61 @@ export function useDevices(
   }, [refresh, intervalMs]);
 
   return { devices, error, loading, refresh };
+}
+
+export function useApprovals(
+  config: DashboardConnectionConfig,
+  intervalMs = 2000,
+) {
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [resolvingIds, setResolvingIds] = useState<Set<string>>(() => new Set());
+  const timer = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await fetchApprovals(config);
+      setApprovals(data);
+      setError(null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to fetch";
+      if (message.includes("API 404")) {
+        setApprovals([]);
+        setError(null);
+      } else {
+        setError(message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [config]);
+
+  const decide = useCallback(async (
+    approvalId: string,
+    decision: "allow" | "deny",
+    options: { remember?: boolean } = {},
+  ) => {
+    setResolvingIds((previous) => new Set(previous).add(approvalId));
+    try {
+      await resolveApproval(approvalId, decision, config, options);
+      await refresh();
+    } finally {
+      setResolvingIds((previous) => {
+        const next = new Set(previous);
+        next.delete(approvalId);
+        return next;
+      });
+    }
+  }, [config, refresh]);
+
+  useEffect(() => {
+    refresh();
+    timer.current = setInterval(refresh, intervalMs);
+    return () => clearInterval(timer.current);
+  }, [refresh, intervalMs]);
+
+  return { approvals, error, loading, resolvingIds, refresh, decide };
 }
 
 export function useAllSessions(params?: {

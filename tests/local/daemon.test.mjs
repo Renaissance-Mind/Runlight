@@ -67,6 +67,19 @@ function testEvents(count, prefix = "sess-daemon") {
   }));
 }
 
+async function waitForApprovalCount(baseUrl, secret, count) {
+  const deadline = Date.now() + 2000;
+  let latest = null;
+  while (Date.now() < deadline) {
+    latest = await (await fetch(`${baseUrl}/approvals`, {
+      headers: { "x-runlight-local-secret": secret },
+    })).json();
+    if (latest.approvals?.length === count) return latest;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return latest;
+}
+
 describe("local daemon", () => {
   it("queues events and flushes them to the configured server", async () => {
     const received = [];
@@ -518,6 +531,71 @@ describe("local daemon", () => {
     assert.equal(event.payload.command_label, "npm test");
     assert.equal(event.payload.automation.automated, true);
     assert.equal(event.payload.automation.source, "scheduled-run");
+  });
+
+  it("holds blocking permission requests until a local approval decision is posted", async () => {
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const config = defaultConfig(env);
+    config.server_url = "http://runlight.test";
+    config.upload_token = "";
+    config.daemon.port = 0;
+    await saveConfig(config, env);
+
+    const daemon = await createDaemonServer({ env });
+    servers.push(() => daemon.close());
+    const baseUrl = `http://127.0.0.1:${daemon.server.address().port}`;
+
+    let settled = false;
+    const permissionResponsePromise = fetch(`${baseUrl}/events/raw`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify({
+        agent: "claude",
+        input: {
+          hook_event_name: "PermissionRequest",
+          session_id: "sess-needs-approval",
+          tool_name: "Bash",
+          tool_input: { command: "rm -rf build" },
+          cwd: process.cwd(),
+        },
+      }),
+    }).then(async (response) => {
+      settled = true;
+      return { status: response.status, body: await response.json() };
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(settled, false);
+
+    const approvals = await waitForApprovalCount(baseUrl, config.local_secret, 1);
+    assert.equal(approvals.approvals.length, 1);
+    assert.equal(approvals.approvals[0].session_id, "sess-needs-approval");
+    assert.equal(approvals.approvals[0].tool_name, "Bash");
+    assert.equal(approvals.approvals[0].status, "pending");
+
+    const resolveResponse = await fetch(`${baseUrl}/approvals/${approvals.approvals[0].id}/resolve`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlight-local-secret": config.local_secret,
+      },
+      body: JSON.stringify({ decision: "allow" }),
+    });
+    assert.equal(resolveResponse.status, 200);
+
+    const permissionResponse = await permissionResponsePromise;
+    assert.equal(permissionResponse.status, 200);
+    assert.equal(permissionResponse.body.status, "resolved");
+    assert.match(permissionResponse.body.hook_response, /"behavior":"allow"/);
+
+    const after = await (await fetch(`${baseUrl}/approvals`, {
+      headers: { "x-runlight-local-secret": config.local_secret },
+    })).json();
+    assert.equal(after.approvals.length, 0);
   });
 
   it("reports daemon status through the local authenticated endpoint", async () => {

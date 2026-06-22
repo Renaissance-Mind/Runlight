@@ -86,6 +86,37 @@ describe("local hook forwarding", () => {
     assert.equal(received[0].body.agent, "codex");
     assert.equal(received[0].body.input.session_id, "sess-forward");
   });
+
+  it("returns blocking approval hook output from the local daemon", async () => {
+    const localDaemon = http.createServer((req, res) => {
+      req.resume();
+      req.on("end", () => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          status: "resolved",
+          hook_response: "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}",
+        }));
+      });
+    });
+    const address = await listen(localDaemon);
+    servers.push(() => closeServer(localDaemon));
+
+    const home = await tempHome();
+    const env = { ...process.env, RUNLIGHT_HOME: home };
+    const saved = defaultConfig(env);
+    saved.local_secret = "local-secret";
+    saved.daemon.port = address.port;
+    await saveConfig(saved, env);
+
+    const result = await postHookInput("claude", JSON.stringify({
+      hook_event_name: "PermissionRequest",
+      session_id: "sess-approval",
+      tool_name: "Bash",
+    }), { env });
+
+    assert.equal(result.sent, true);
+    assert.match(result.hookResponse, /"behavior":"allow"/);
+  });
 });
 
 describe("local daemon hook event enrichment", () => {

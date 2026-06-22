@@ -4,7 +4,13 @@ import {
   type DashboardConnectionConfig,
   resolveDashboardConfig,
 } from "./config.ts";
-import type { DeviceRecord, Session, SessionEvent } from "../types/session.ts";
+import type {
+  ApprovalRequest,
+  ApprovalResolution,
+  DeviceRecord,
+  Session,
+  SessionEvent,
+} from "../types/session.ts";
 
 async function fetchJSON<T>(
   config: DashboardConnectionConfig,
@@ -144,6 +150,29 @@ export async function fetchDevices(
 ): Promise<DeviceRecord[]> {
   const data = await fetchJSON<{ devices: DeviceRecord[] }>(config, "/devices");
   return data.devices;
+}
+
+export async function fetchApprovals(
+  config: DashboardConnectionConfig = defaultConfig,
+): Promise<ApprovalRequest[]> {
+  const data = await fetchJSON<{ approvals: ApprovalRequest[] }>(config, "/approvals");
+  return data.approvals;
+}
+
+export async function resolveApproval(
+  approvalId: string,
+  decision: "allow" | "deny",
+  config: DashboardConnectionConfig = defaultConfig,
+  options: { remember?: boolean } = {},
+): Promise<ApprovalResolution> {
+  return fetchJSON<ApprovalResolution>(
+    config,
+    `/approvals/${encodeURIComponent(approvalId)}/resolve`,
+    {
+      method: "POST",
+      body: JSON.stringify({ decision, remember: Boolean(options.remember) }),
+    },
+  );
 }
 
 export async function deleteSession(

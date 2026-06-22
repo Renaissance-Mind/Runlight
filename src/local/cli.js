@@ -20,8 +20,14 @@ import {
   localDaemonUrl,
   resolvePaths,
 } from "./paths.js";
-import { installClaudePlugin, installCodexPlugin, pluginStatus, uninstallClaudePlugin, uninstallCodexPlugin } from "./plugins.js";
+import {
+  installAgentPlugin,
+  pluginStatus,
+  SUPPORTED_PLUGIN_TARGETS,
+  uninstallAgentPlugin,
+} from "./plugins.js";
 import { postHookInput, readStdin } from "./hook.js";
+import { isSupportedAgentSource, normalizeAgentSource } from "./agent-registry.js";
 import { confirm, intro, note, openUrl, outro, promptSecret, promptText, select } from "./prompts.js";
 import {
   buildLocalConfigPatch,
@@ -43,11 +49,11 @@ Usage:
   runlight status [--json]
   runlight health [--json]
   runlight setting
-  runlight plugin <codex|claude|all> [--uninstall]
+  runlight plugin <agent|all> [--uninstall]
   runlight daemon <run|start|stop|restart|install>
   runlight server <run|start|stop>
   runlight dashboard <run|start|stop>
-  runlight hook <codex|claude>
+  runlight hook <agent>
 
 Environment:
   RUNLIGHT_HOME          Override local config directory
@@ -257,7 +263,7 @@ async function runLogout(opts) {
   }
   note("Signed out", [
     "Upload token removed from local config.",
-    opts.keepHooks ? "Local hooks left installed." : "Codex and Claude hooks removed.",
+    opts.keepHooks ? "Local hooks left installed." : "Local agent hooks removed.",
     opts.keepDaemon ? "Daemon left running." : daemon.stopped ? "Daemon stopped." : "Daemon was not running.",
     opts.keepServer ? "Local server left running." : server.stopped ? "Local server stopped." : "Local server was not running.",
     opts.keepDashboard ? "Dashboard left running." : dashboard.stopped ? "Dashboard stopped." : "Dashboard was not running.",
@@ -345,34 +351,40 @@ async function runStatus(opts) {
     console.log(`Upload:       ${parts.join(", ")}`);
     if (daemon.state.upload_error) console.log(`Upload error: ${daemon.state.upload_error}`);
   }
-  console.log(`Codex hook:   ${plugins.codex.installed ? "installed" : "not installed"}`);
-  console.log(`Claude hook:  ${plugins.claude.installed ? "installed" : "not installed"}`);
+  const installedHooks = Object.entries(plugins)
+    .filter(([, value]) => value.installed)
+    .map(([agent]) => agent);
+  console.log(`Agent hooks:  ${installedHooks.length ? installedHooks.join(", ") : "not installed"}`);
   return payload;
 }
 
 async function installPlugin(target, opts) {
   const command = opts.command ? String(opts.command) : undefined;
-  if (target === "codex") return installCodexPlugin({ command });
-  if (target === "claude") return installClaudePlugin({ command });
   if (target === "all") {
-    return {
-      codex: await installCodexPlugin({ command: command?.replace(/\bclaude\b/g, "codex") }),
-      claude: await installClaudePlugin({ command: command?.replace(/\bcodex\b/g, "claude") }),
-    };
+    const results = {};
+    for (const agent of SUPPORTED_PLUGIN_TARGETS) {
+      results[agent] = await installAgentPlugin(agent, { command: command?.replace(/\b(codex|claude)\b/g, agent) });
+    }
+    return results;
   }
-  throw new Error("Plugin target must be codex, claude, or all");
+  if (SUPPORTED_PLUGIN_TARGETS.includes(normalizeAgentSource(target))) {
+    return installAgentPlugin(target, { command });
+  }
+  throw new Error(`Plugin target must be one of: all, ${SUPPORTED_PLUGIN_TARGETS.join(", ")}`);
 }
 
 async function uninstallPlugin(target) {
-  if (target === "codex") return uninstallCodexPlugin();
-  if (target === "claude") return uninstallClaudePlugin();
   if (target === "all") {
-    return {
-      codex: await uninstallCodexPlugin(),
-      claude: await uninstallClaudePlugin(),
-    };
+    const results = {};
+    for (const agent of SUPPORTED_PLUGIN_TARGETS) {
+      results[agent] = await uninstallAgentPlugin(agent);
+    }
+    return results;
   }
-  throw new Error("Plugin target must be codex, claude, or all");
+  if (SUPPORTED_PLUGIN_TARGETS.includes(normalizeAgentSource(target))) {
+    return uninstallAgentPlugin(target);
+  }
+  throw new Error(`Plugin target must be one of: all, ${SUPPORTED_PLUGIN_TARGETS.join(", ")}`);
 }
 
 function setupTargetFromOptions(opts) {
@@ -500,7 +512,7 @@ async function runSetting(positional) {
       { value: "server", label: "Server URL", hint: "Cloudflare Worker or self-hosted server" },
       { value: "token", label: "Upload token", hint: "Generated from the browser connect page" },
       { value: "port", label: "Daemon port", hint: "Local 127.0.0.1 listener" },
-      { value: "plugins", label: "Install plugins", hint: "Codex and Claude hooks" },
+      { value: "plugins", label: "Install plugins", hint: "Agent hooks" },
       { value: "show", label: "Show config path" },
       { value: "exit", label: "Exit" },
     ]);
@@ -516,7 +528,7 @@ async function runSetting(positional) {
       await updateConfig({ daemon: { port: Number(value) } });
     } else if (choice === "plugins") {
       const target = await select("Install hooks", [
-        { value: "all", label: "Codex + Claude" },
+        { value: "all", label: "All known agents" },
         { value: "codex", label: "Codex only" },
         { value: "claude", label: "Claude only" },
       ]);
@@ -542,7 +554,7 @@ async function runSetup(opts = {}) {
   note("What this does", [
     "Connects this machine to a Runlight server.",
     "Starts the required local services.",
-    "Installs local Codex and Claude hooks when this machine is a client.",
+    "Installs local agent hooks when this machine is a client.",
   ]);
   const explicitMode = setupModeFromOptions(opts);
   const mode = explicitMode || await select("Choose setup mode", [
@@ -696,10 +708,11 @@ async function runSelfHostedServerSetup(opts = {}, { includeClient = false } = {
 }
 
 async function runHook(positional) {
-  const agent = positional[1];
-  if (agent !== "codex" && agent !== "claude") throw new Error("Usage: runlight hook <codex|claude>");
+  const agent = normalizeAgentSource(positional[1]);
+  if (!isSupportedAgentSource(agent)) throw new Error("Usage: runlight hook <agent>");
   const input = await readStdin();
-  await postHookInput(agent, input);
+  const result = await postHookInput(agent, input);
+  if (result.hookResponse) process.stdout.write(result.hookResponse);
 }
 
 export async function main(argv) {

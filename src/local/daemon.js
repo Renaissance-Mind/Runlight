@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
+import crypto from "node:crypto";
 import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -7,6 +8,14 @@ import { fileURLToPath } from "node:url";
 import { loadConfig, loadOrCreateConfig, redactConfig } from "./config.js";
 import { enrichRawHookEvents, shouldIgnoreUnpersistedCodexStartup } from "./enrich.js";
 import { ensureRuntimeDirs, localDaemonUrl, resolvePaths } from "./paths.js";
+import {
+  approvalResponseForDecision,
+  isBlockingApprovalEvent,
+  normalizeAgentSource,
+  sessionIdFromInput,
+  toolInputFromInput,
+  toolNameFromInput,
+} from "./agent-registry.js";
 
 const MAX_BATCH_EVENTS = 200;
 const MAX_DRAIN_BATCHES = 25;
@@ -52,6 +61,62 @@ function validateEvent(event) {
   for (const key of ["session_id", "agent_type", "adapter_name", "event_type", "event_time"]) {
     if (!String(event[key] || "").trim()) throw new Error(`event missing ${key}`);
   }
+}
+
+function approvalToJson(approval) {
+  return {
+    id: approval.id,
+    status: approval.status,
+    agent: approval.agent,
+    session_id: approval.session_id,
+    session_name: approval.session_name || null,
+    tool_name: approval.tool_name || "",
+    summary: approval.summary || null,
+    requested_at: approval.requested_at,
+    event_type: approval.event_type,
+    tool_input: approval.tool_input,
+    workspace_cwd: approval.workspace_cwd || null,
+    machine_hostname: approval.machine_hostname || null,
+  };
+}
+
+function buildApprovalRecord(raw, event) {
+  const input = raw?.input || {};
+  let release;
+  const wait = new Promise((resolve) => {
+    release = resolve;
+  });
+  return {
+    id: crypto.randomUUID(),
+    status: "pending",
+    agent: normalizeAgentSource(raw?.agent),
+    session_id: sessionIdFromInput(input) || event.session_id,
+    session_name: event.session_name || null,
+    tool_name: toolNameFromInput(input) || event.payload?.tool_name || "",
+    tool_input: toolInputFromInput(input),
+    summary: event.summary || null,
+    requested_at: new Date().toISOString(),
+    event_type: event.event_type,
+    workspace_cwd: event.workspace?.cwd || null,
+    machine_hostname: event.machine?.hostname || null,
+    event,
+    wait,
+    release,
+  };
+}
+
+function buildPermissionResolvedEvent(approval, decision) {
+  return {
+    ...approval.event,
+    event_type: "permission.resolved",
+    event_time: new Date().toISOString(),
+    severity: decision === "deny" ? "warning" : "info",
+    summary: `Permission ${decision}: ${approval.tool_name || "tool"}`,
+    payload: {
+      ...(approval.event.payload || {}),
+      decision,
+    },
+  };
 }
 
 async function readState(paths) {
@@ -295,6 +360,7 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
   let flushPromise = null;
   let flushRequested = false;
   const ignoredRawCodexSessions = new Set();
+  const approvals = new Map();
 
   async function scheduleFlush() {
     if (flushPromise) {
@@ -340,9 +406,41 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
         service: "runlight-daemon",
         config: redactConfig(freshConfig),
         pending_count: queue.pending_count,
+        pending_approval_count: approvals.size,
         queue,
         state,
       });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/approvals") {
+      jsonResponse(res, 200, {
+        approvals: Array.from(approvals.values()).map(approvalToJson),
+      });
+      return;
+    }
+
+    const approvalResolveMatch = url.pathname.match(/^\/approvals\/([^/]+)\/resolve$/);
+    if (req.method === "POST" && approvalResolveMatch) {
+      const id = decodeURIComponent(approvalResolveMatch[1]);
+      const approval = approvals.get(id);
+      if (!approval) {
+        jsonResponse(res, 404, { detail: "Approval request not found" });
+        return;
+      }
+
+      const body = await readJsonRequest(req);
+      const decision = body.decision === "deny" ? "deny" : "allow";
+      const hookResponse = approvalResponseForDecision(decision, {
+        remember: Boolean(body.remember),
+        toolName: approval.tool_name,
+      });
+      approvals.delete(id);
+      approval.status = "resolved";
+      approval.release({ decision, hook_response: hookResponse });
+      await enqueueEvents(paths, [buildPermissionResolvedEvent(approval, decision)]);
+      scheduleFlush();
+      jsonResponse(res, 200, { id, status: "resolved", decision });
       return;
     }
 
@@ -385,6 +483,21 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
       }
       const queued = await enqueueEvents(paths, events);
       scheduleFlush();
+      if (acceptedRawEvents.length === 1 && events.length === 1 && isBlockingApprovalEvent(acceptedRawEvents[0]?.input || {})) {
+        const approval = buildApprovalRecord(acceptedRawEvents[0], events[0]);
+        approvals.set(approval.id, approval);
+        const result = await approval.wait;
+        jsonResponse(res, 200, {
+          status: "resolved",
+          count: queued.count,
+          ignored_count: ignoredCount,
+          pending_count: await countPending(paths),
+          approval_id: approval.id,
+          decision: result.decision,
+          hook_response: result.hook_response,
+        });
+        return;
+      }
       jsonResponse(res, 202, { status: "queued", count: queued.count, ignored_count: ignoredCount, pending_count: await countPending(paths) });
       return;
     }
@@ -427,6 +540,14 @@ export async function createDaemonServer({ env = process.env, fetchImpl = fetch 
   scheduleFlush();
 
   async function close() {
+    for (const approval of approvals.values()) {
+      approval.status = "closed";
+      approval.release({
+        decision: "deny",
+        hook_response: approvalResponseForDecision("deny", { toolName: approval.tool_name }),
+      });
+    }
+    approvals.clear();
     if (flushTimer) clearInterval(flushTimer);
     if (flushPromise) await flushPromise.catch(() => null);
     await new Promise((resolve) => server.close(resolve));

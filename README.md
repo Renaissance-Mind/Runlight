@@ -31,12 +31,13 @@ failures, and aborts behind one shared API.
 Use it when you want to see which agents are running, waiting, stale, finished,
 or failed across projects, machines, branches, and sessions. The repository
 contains local and serverless backends, a React dashboard, a macOS menu bar
-viewer, packaged Codex and Claude Code integrations, and a Python adapter for
-custom clients.
+viewer, packaged hook integrations for common agent CLIs, and a Python adapter
+for custom clients.
 
 ## Features
 
-- Daemon-first local ingestion for Codex and Claude Code
+- Daemon-first local ingestion for Codex, Claude Code, and other hook-capable agent CLIs
+- Optional local approval queue for blocking permission hooks, with dashboard Allow, Always, and Deny actions
 - npm-installed `runlight` CLI with one-command setup, login, status, health, settings, and plugin installation commands
 - Local durable queue for hook events before upload
 - Shared event protocol for all agent adapters
@@ -57,6 +58,7 @@ flowchart LR
   subgraph Local
     Codex["Codex hook"]
     Claude["Claude Code hook"]
+    Agents["Other agent hooks"]
     Daemon["Runlight local daemon<br/>127.0.0.1:18767"]
     LocalServer["Embedded local server<br/>127.0.0.1:18765"]
     LocalDashboard["Embedded dashboard<br/>127.0.0.1:18766"]
@@ -76,6 +78,7 @@ flowchart LR
 
   Codex -->|"runlight hook codex"| Daemon
   Claude -->|"runlight hook claude"| Daemon
+  Agents -->|"runlight hook <agent>"| Daemon
   Daemon -->|"local mode"| LocalServer
   LocalDashboard --> LocalServer
   Daemon -->|"POST /api/events"| Servers
@@ -84,12 +87,12 @@ flowchart LR
   Viewers -->|"GET /api/sessions/*"| Servers
 ```
 
-Codex and Claude hooks never upload directly to the hosted server. They hand raw
-hook payloads to the local daemon, which maps them to Runlight protocol events,
-adds local metadata such as Codex titles, pinned state, and automation hints,
-stores them in `~/.runlight/queue`, and uploads them with the user's
-dashboard-generated upload token. The same server and viewer contract works
-against both server implementations.
+Agent hooks never upload directly to the hosted server. They hand raw hook
+payloads to the local daemon, which maps them to Runlight protocol events, adds
+local metadata such as Codex titles, pinned state, and automation hints, stores
+events in `~/.runlight/queue`, handles local approval waits when enabled, and
+uploads events with the user's dashboard-generated upload token. The same server
+and viewer contract works against both server implementations.
 See [docs/architecture.md](docs/architecture.md) for the detailed component
 model and deployment boundaries.
 
@@ -136,7 +139,7 @@ The setup flow asks which mode you want:
 
 - **Runlight Cloud** opens a browser login page, signs you in, returns the
   upload credential to the CLI automatically, starts the daemon, and installs
-  Codex and Claude hooks.
+  local agent hooks.
 - **Local only** starts an embedded local server, dashboard, and daemon on this
   machine. It does not require an account or a visible token.
 - **Self-hosted** lets this machine run the server, act as a client for another
@@ -162,12 +165,12 @@ background.
 runlight status
 ```
 
-Start a fresh Codex or Claude Code session after installing hooks, then watch it
+Start a fresh agent session after installing hooks, then watch it
 appear in the dashboard.
 
 For advanced/manual setup, open `/connect` on your Runlight server without a
 CLI handoff code, copy the token shown there, then use `runlight login`,
-`runlight daemon start`, and `runlight plugin <codex|claude>`.
+`runlight daemon start`, and `runlight plugin <agent>`.
 
 To disconnect this machine from Runlight:
 
@@ -175,7 +178,7 @@ To disconnect this machine from Runlight:
 runlight logout
 ```
 
-Logout removes the local upload token, uninstalls Codex and Claude hooks, and
+Logout removes the local upload token, uninstalls local agent hooks, and
 stops the local daemon. Run `runlight setup` again to reconnect.
 
 ### Local Development Server
@@ -247,6 +250,29 @@ bash install.sh
 
 The Claude Code integration records session lifecycle, tool activity,
 permission requests, prompts, subagent starts and stops, and terminal events.
+
+Permission requests are installed as blocking local hooks where the provider
+supports that behavior. The local daemon records the wait, exposes it to the
+local dashboard, and writes the allow/deny hook response back to the waiting
+agent after the user decides. Hosted Runlight APIs remain an observability
+surface; approval decisions are served by the local daemon on the machine that
+is running the hook.
+
+### Additional Agents
+
+Runlight's hook registry recognizes the same built-in source vocabulary across
+normalization, ingestion, and plugin installation:
+
+```text
+claude, codex, gemini, cursor, cursor-cli, trae, traecn, traecli,
+copilot, qoder, qoder-cli, droid, codebuddy, codybuddycn, stepfun,
+opencode, antigravity, google-antigravity, workbuddy, hermes, qwen,
+kimi, pi, kiro, cline
+```
+
+Use `runlight plugin <agent>` for agents with JSON hook configuration support,
+or configure a provider-specific extension to call `runlight hook <agent>` and
+send the provider's hook JSON on stdin.
 
 ### Python and Generic CLI
 
@@ -401,7 +427,7 @@ curl -X POST http://127.0.0.1:18765/api/events \
 
 Standard event types include `session.started`, `session.heartbeat`,
 `tool.started`, `tool.finished`, `command.started`, `command.finished`,
-`permission.requested`, `user_input.waiting`, `external.waiting`,
+`permission.requested`, `permission.resolved`, `user_input.waiting`, `external.waiting`,
 `session.completed`, `session.failed`, and `session.aborted`.
 
 ## Configuration
@@ -517,12 +543,12 @@ swift run RunlightBar
 
 ## Known Boundaries
 
-- Hook installers modify user-level Codex or Claude Code configuration.
+- Hook installers modify user-level agent configuration files.
 - Codex plugin installation alone does not activate monitoring; run
   `runlight plugin codex` or the bundled hook installer after plugin install or
   update.
-- Codex and Claude hooks are fail-open and only call the local daemon. The
-  daemon owns token storage, event enrichment, queueing, retry, and upload.
+- Agent hooks are fail-open and only call the local daemon. The daemon owns
+  token storage, event enrichment, approval waits, queueing, retry, and upload.
 - Do not expose the self-hosted server to untrusted networks without TLS and an
   explicit auth boundary.
 - No license file is currently present in this repository.

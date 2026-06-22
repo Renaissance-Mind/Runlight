@@ -2,6 +2,15 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import {
+  adapterNameForSource,
+  agentTypeForSource,
+  normalizeAgentSource,
+  normalizedHookEventNameFromInput,
+  sessionIdFromInput,
+  toolInputFromInput,
+  toolNameFromInput,
+} from "./agent-registry.js";
 
 function firstLine(value, max = 240) {
   return String(value || "")
@@ -217,112 +226,96 @@ function attachAutomation(payload, automation) {
   };
 }
 
-async function buildCodexEvent(input, config, env) {
-  const hookEvent = input.hook_event_name || "";
-  const sessionId = input.session_id || "";
-  if (!sessionId) return null;
-
-  const toolName = input.tool_name || "";
-  const model = input.model || "";
-  const command = firstLine(input.tool_input?.command, 100);
-  const filePath = input.tool_input?.file_path || "";
-  const automation = detectAutomation(input, env);
-
-  const common = {
-    session_id: sessionId,
-    session_name: await resolveCodexSessionName(sessionId, env),
-    session_pin: await resolveCodexSessionPin(sessionId, env),
-    agent_type: "codex",
-    adapter_name: "codex-hook",
-    adapter_version: "0.3.0",
-    event_time: new Date().toISOString(),
-    severity: "info",
-    machine: buildMachine(config),
-    workspace: buildWorkspace(input.cwd || process.cwd()),
-  };
-
-  switch (hookEvent) {
-    case "SessionStart":
-      return { ...common, event_type: "session.started", summary: `Codex session started (model: ${model})`, payload: attachAutomation({ model }, automation) };
-    case "PreToolUse":
-      if (toolName === "Bash" || toolName === "bash") {
-        return { ...common, event_type: "command.started", summary: `Bash: ${command}`, payload: attachAutomation(toolPayload(toolName, { command_label: command }), automation) };
-      }
-      return { ...common, event_type: "tool.started", summary: `Tool: ${toolName}`, payload: attachAutomation(toolPayload(toolName, { file_path: filePath }), automation) };
-    case "PostToolUse":
-      if (toolName === "Bash" || toolName === "bash") {
-        return { ...common, event_type: "command.finished", summary: `Bash done: ${toolName}`, payload: attachAutomation(toolPayload(toolName), automation) };
-      }
-      return { ...common, event_type: "tool.finished", summary: `Tool done: ${toolName}`, payload: attachAutomation(toolPayload(toolName), automation) };
-    case "PostToolUseFailure":
-      return { ...common, event_type: "tool.finished", severity: "warning", summary: `Tool failed: ${toolName}`, payload: attachAutomation(toolPayload(toolName, { failed: true }), automation) };
-    case "UserPromptSubmit":
-      return { ...common, event_type: "message.started", summary: "User prompt submitted", payload: attachAutomation(null, automation) };
-    case "Stop":
-      return { ...common, event_type: "message.finished", summary: "Codex response finished", payload: attachAutomation(null, automation) };
-    default:
-      return null;
-  }
+function displayAgentName(agent) {
+  if (agent === "claude") return "Claude Code";
+  if (agent === "codex") return "Codex";
+  if (agent === "qwen") return "Qwen Code";
+  if (agent === "kimi") return "Kimi Code";
+  return agent.split("-").map((part) => part.slice(0, 1).toUpperCase() + part.slice(1)).join(" ");
 }
 
-async function buildClaudeEvent(input, config, env) {
-  const hookEvent = input.hook_event_name || "";
-  const sessionId = input.session_id || "";
+function isShellTool(toolName) {
+  return ["Bash", "bash", "Shell", "shell", "Terminal", "terminal"].includes(toolName);
+}
+
+function eventPayload(input, toolName, automation) {
+  const toolInput = toolInputFromInput(input);
+  const command = firstLine(toolInput.command || toolInput.cmd || toolInput.script, 100);
+  const filePath = toolInput.file_path || toolInput.filePath || toolInput.path || "";
+  const payload = toolPayload(toolName, {
+    ...(command ? { command_label: command } : {}),
+    ...(filePath ? { file_path: filePath } : {}),
+    ...(Object.keys(toolInput).length ? { tool_input: toolInput } : {}),
+  });
+  return attachAutomation(payload, automation);
+}
+
+async function buildGenericHookEvent(agent, input, config, env = process.env) {
+  const source = normalizeAgentSource(agent);
+  const hookEvent = normalizedHookEventNameFromInput(input);
+  const sessionId = sessionIdFromInput(input);
   if (!sessionId) return null;
 
-  const toolName = input.tool_name || "";
-  const model = input.model || "";
-  const command = firstLine(input.tool_input?.command, 100);
-  const filePath = input.tool_input?.file_path || "";
+  const toolName = toolNameFromInput(input);
+  const toolInput = toolInputFromInput(input);
+  const model = input.model || input.model_name || input.modelName || "";
+  const command = firstLine(toolInput.command || toolInput.cmd || toolInput.script, 100);
   const automation = detectAutomation(input, env);
+  const agentName = displayAgentName(source);
 
   const common = {
     session_id: sessionId,
-    agent_type: "claude_code",
-    adapter_name: "claude-code-hook",
+    session_name: source === "codex" ? await resolveCodexSessionName(sessionId, env) : firstLine(input.session_name || input.title || ""),
+    session_pin: source === "codex" ? await resolveCodexSessionPin(sessionId, env) : Boolean(input.session_pin || input.pinned),
+    agent_type: agentTypeForSource(source),
+    adapter_name: adapterNameForSource(source),
     adapter_version: "0.3.0",
     event_time: new Date().toISOString(),
     severity: "info",
     machine: buildMachine(config),
-    workspace: buildWorkspace(input.cwd || process.cwd()),
+    workspace: buildWorkspace(input.cwd || input.workspace || process.cwd()),
   };
 
   switch (hookEvent) {
     case "SessionStart":
-      return { ...common, event_type: "session.started", summary: `Claude Code session started (model: ${model})`, payload: attachAutomation({ model, source: input.source || "" }, automation) };
-    case "PreToolUse":
-      if (toolName === "Bash" || toolName === "bash") {
-        return { ...common, event_type: "command.started", summary: `Bash: ${command}`, payload: attachAutomation(toolPayload(toolName, { command_label: command }), automation) };
-      }
-      return { ...common, event_type: "tool.started", summary: `Tool: ${toolName}`, payload: attachAutomation(toolPayload(toolName, { file_path: filePath }), automation) };
-    case "PostToolUse":
-      if (toolName === "Bash" || toolName === "bash") {
-        return { ...common, event_type: "command.finished", summary: `Bash done: ${toolName}`, payload: attachAutomation(toolPayload(toolName), automation) };
-      }
-      return { ...common, event_type: "tool.finished", summary: `Tool done: ${toolName}`, payload: attachAutomation(toolPayload(toolName), automation) };
-    case "PostToolUseFailure":
-      return { ...common, event_type: "tool.finished", severity: "warning", summary: `Tool failed: ${toolName}`, payload: attachAutomation(toolPayload(toolName, { failed: true }), automation) };
-    case "PermissionRequest":
-      return { ...common, event_type: "permission.requested", summary: `Permission: ${toolName}`, payload: attachAutomation(toolPayload(toolName), automation) };
+      return { ...common, event_type: "session.started", summary: `${agentName} session started${model ? ` (model: ${model})` : ""}`, payload: attachAutomation({ model, source: input.source || source }, automation) };
+    case "SessionEnd":
+      return { ...common, event_type: "session.completed", summary: `${agentName} session ended`, payload: attachAutomation({ reason: input.reason || "" }, automation) };
     case "UserPromptSubmit":
       return { ...common, event_type: "message.started", summary: "User prompt submitted", payload: attachAutomation(null, automation) };
+    case "PreToolUse":
+      if (isShellTool(toolName)) {
+        return { ...common, event_type: "command.started", summary: `${toolName || "Shell"}: ${command}`, payload: eventPayload(input, toolName, automation) };
+      }
+      return { ...common, event_type: "tool.started", summary: `Tool: ${toolName}`, payload: eventPayload(input, toolName, automation) };
+    case "PostToolUse":
+      if (isShellTool(toolName)) {
+        return { ...common, event_type: "command.finished", summary: `${toolName || "Shell"} done`, payload: eventPayload(input, toolName, automation) };
+      }
+      return { ...common, event_type: "tool.finished", summary: `Tool done: ${toolName}`, payload: eventPayload(input, toolName, automation) };
+    case "PostToolUseFailure":
+      return { ...common, event_type: "tool.finished", severity: "warning", summary: `Tool failed: ${toolName}`, payload: attachAutomation({ ...eventPayload(input, toolName, automation), failed: true }, automation) };
+    case "PermissionRequest":
+      return { ...common, event_type: "permission.requested", summary: `Permission: ${toolName || "tool"}`, payload: eventPayload(input, toolName, automation) };
     case "SubagentStart":
       return { ...common, event_type: "tool.started", summary: "Subagent started", payload: attachAutomation(toolPayload("subagent"), automation) };
     case "SubagentStop":
       return { ...common, event_type: "tool.finished", summary: "Subagent finished", payload: attachAutomation(toolPayload("subagent"), automation) };
-    case "SessionEnd":
-      return { ...common, event_type: "session.completed", summary: "Claude Code session ended", payload: attachAutomation({ reason: input.reason || "" }, automation) };
+    case "Notification":
+      return { ...common, event_type: input.question ? "user_input.waiting" : "session.heartbeat", summary: firstLine(input.question || input.message || "Notification"), payload: attachAutomation(input.question ? { question: input.question } : null, automation) };
+    case "PreCompact":
+      return { ...common, event_type: "external.waiting", summary: "Compaction started", payload: attachAutomation({ reason: "compact" }, automation) };
+    case "AfterAgentResponse":
+    case "TaskRoundComplete":
     case "Stop":
-      return { ...common, event_type: "message.finished", summary: "Claude Code response finished", payload: attachAutomation(null, automation) };
+      return { ...common, event_type: "message.finished", summary: `${agentName} response finished`, payload: attachAutomation(null, automation) };
     default:
       return null;
   }
 }
 
 export async function buildHookEvent(agent, input, config, env = process.env) {
-  if (agent === "codex") return buildCodexEvent(input, config, env);
-  if (agent === "claude") return buildClaudeEvent(input, config, env);
-  throw new Error(`Unsupported hook agent: ${agent}`);
+  return buildGenericHookEvent(agent, input, config, env);
 }
 
 export async function enrichRawHookEvents(rawEvents, config, env = process.env) {

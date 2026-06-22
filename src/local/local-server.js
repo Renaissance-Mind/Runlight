@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import http from "node:http";
-import { ensureRuntimeDirs, resolvePaths } from "./paths.js";
+import { loadConfig } from "./config.js";
+import { ensureRuntimeDirs, localDaemonUrl, resolvePaths } from "./paths.js";
 
 const COMPLETION_EVENT_TYPES = new Set([
   "message.finished",
@@ -110,6 +111,21 @@ async function readJsonRequest(req) {
   const raw = Buffer.concat(chunks).toString("utf8").trim();
   if (!raw) return {};
   return JSON.parse(raw);
+}
+
+async function proxyDaemonJson(pathname, { method = "GET", body, env = process.env } = {}) {
+  const config = await loadConfig(env);
+  const response = await fetch(`${localDaemonUrl(config)}${pathname}`, {
+    method,
+    headers: {
+      "content-type": "application/json",
+      "x-runlight-local-secret": config.local_secret,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  const data = text.trim() ? JSON.parse(text) : {};
+  return { status: response.status, data };
 }
 
 function normalizeEvents(body) {
@@ -412,6 +428,24 @@ export async function createLocalServer({
     }
     if (req.method === "GET" && url.pathname === "/api/users/current") {
       jsonResponse(req, res, 200, { user_id: userId });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/approvals") {
+      const result = await proxyDaemonJson("/approvals", { env });
+      jsonResponse(req, res, result.status, result.data);
+      return;
+    }
+
+    const approvalResolveMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)\/resolve$/);
+    if (req.method === "POST" && approvalResolveMatch) {
+      const body = await readJsonRequest(req);
+      const result = await proxyDaemonJson(`/approvals/${approvalResolveMatch[1]}/resolve`, {
+        method: "POST",
+        body,
+        env,
+      });
+      jsonResponse(req, res, result.status, result.data);
       return;
     }
 
