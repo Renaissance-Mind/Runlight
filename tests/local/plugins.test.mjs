@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import {
   enableCodexHooksFeatureToml,
+  installAllAgentPlugins,
   installAgentPlugin,
   installClaudePlugin,
   installCodexPlugin,
@@ -111,5 +112,26 @@ describe("local plugin installers", () => {
     assert.equal(settings.hooks.SessionStart[0].hooks[0].command, "runlight hook qwen");
     assert.equal(settings.hooks.PermissionRequest[0].hooks[0].timeout, 86400);
     assert.equal(settings.hooks.PermissionRequest[0].hooks[0].async, false);
+  });
+
+  it("keeps installing all hooks when one agent config path fails", async () => {
+    const home = await tempDir("runlight-plugin-all-home-");
+    const codexHome = path.join(home, "codex-home");
+    await fs.writeFile(path.join(home, ".claude"), "not a directory\n");
+    const env = { ...process.env, HOME: home, CODEX_HOME: codexHome };
+
+    const result = await installAllAgentPlugins({ env, command: "runlight hook codex" });
+
+    assert.equal(result.codex.hooksFile, path.join(codexHome, "hooks.json"));
+    assert.equal(result.gemini.installed, true);
+    assert.equal(result.claude.installed, false);
+    assert.ok(result.claude.error.message);
+    assert.match(result.claude.error.path, /\.claude/);
+
+    const codexHooks = JSON.parse(await fs.readFile(path.join(codexHome, "hooks.json"), "utf8"));
+    assert.equal(codexHooks.hooks.SessionStart[0].hooks[0].command, "runlight hook codex");
+
+    const geminiSettings = JSON.parse(await fs.readFile(path.join(home, ".gemini", "settings.json"), "utf8"));
+    assert.equal(geminiSettings.hooks.SessionStart[0].hooks[0].command, "runlight hook gemini");
   });
 });

@@ -21,9 +21,11 @@ import {
   resolvePaths,
 } from "./paths.js";
 import {
+  installAllAgentPlugins,
   installAgentPlugin,
   pluginStatus,
   SUPPORTED_PLUGIN_TARGETS,
+  uninstallAllAgentPlugins,
   uninstallAgentPlugin,
 } from "./plugins.js";
 import { postHookInput, readStdin } from "./hook.js";
@@ -369,11 +371,7 @@ async function runStatus(opts) {
 async function installPlugin(target, opts) {
   const command = opts.command ? String(opts.command) : undefined;
   if (target === "all") {
-    const results = {};
-    for (const agent of SUPPORTED_PLUGIN_TARGETS) {
-      results[agent] = await installAgentPlugin(agent, { command: command?.replace(/\b(codex|claude)\b/g, agent) });
-    }
-    return results;
+    return installAllAgentPlugins({ command });
   }
   if (SUPPORTED_PLUGIN_TARGETS.includes(normalizeAgentSource(target))) {
     return installAgentPlugin(target, { command });
@@ -381,13 +379,34 @@ async function installPlugin(target, opts) {
   throw new Error(`Plugin target must be one of: all, ${SUPPORTED_PLUGIN_TARGETS.join(", ")}`);
 }
 
+function pluginFailureLines(result) {
+  if (!result || typeof result !== "object") return [];
+  return Object.entries(result)
+    .filter(([, value]) => value && typeof value === "object" && value.error)
+    .map(([agent, value]) => {
+      const error = value.error || {};
+      const parts = [error.code, error.message, error.path].filter(Boolean);
+      return `${agent}: ${parts.join(" - ")}`;
+    });
+}
+
+function notePluginWarnings(result) {
+  const failures = pluginFailureLines(result);
+  if (failures.length) {
+    note("Hook install warnings", failures);
+  }
+}
+
+async function installSetupPlugins(target) {
+  if (target === "skip") return { skipped: true };
+  const result = await installPlugin(target, {});
+  notePluginWarnings(result);
+  return result;
+}
+
 async function uninstallPlugin(target) {
   if (target === "all") {
-    const results = {};
-    for (const agent of SUPPORTED_PLUGIN_TARGETS) {
-      results[agent] = await uninstallAgentPlugin(agent);
-    }
-    return results;
+    return uninstallAllAgentPlugins();
   }
   if (SUPPORTED_PLUGIN_TARGETS.includes(normalizeAgentSource(target))) {
     return uninstallAgentPlugin(target);
@@ -442,9 +461,10 @@ async function runUpgrade(opts) {
 
   note("Upgrade result", [
     result.install.skipped ? `Dry run: ${result.install.command} ${result.install.args.join(" ")}` : "Package upgrade completed.",
-    result.hooks.skipped ? "Agent hooks were skipped." : "Agent hooks refreshed.",
+    result.hooks.skipped ? "Agent hooks were skipped." : pluginFailureLines(result.hooks).length ? "Agent hooks refreshed with warnings." : "Agent hooks refreshed.",
     result.daemon.skipped ? "Daemon restart skipped." : "Daemon restarted.",
   ]);
+  notePluginWarnings(result.hooks);
   outro("Run `runlight --version` to confirm the installed version.");
   return result;
 }
@@ -633,7 +653,7 @@ async function runCloudSetup(opts = {}) {
   await updateConfig({ server_url: serverUrl, upload_token: token });
   const daemon = await startDaemon();
   const target = setupTargetFromOptions(opts);
-  if (target !== "skip") await installPlugin(target, {});
+  await installSetupPlugins(target);
   if (target === "all" || target === "codex") printCodexTrustNotice();
   outro("Runlight is ready. Run `runlight status` any time to check it.");
   return { serverUrl, daemon, plugins: target };
@@ -658,7 +678,7 @@ async function runLocalSetup(opts = {}) {
   const dashboard = await startManagedDashboard({ host: dashboardHost, port: dashboardPort, serverUrl: patch.server_url });
   const daemon = await startDaemon();
   const target = setupTargetFromOptions(opts);
-  if (target !== "skip") await installPlugin(target, {});
+  await installSetupPlugins(target);
   if (!opts.noOpen) openUrl(`http://${dashboardHost}:${dashboardPort}`);
   if (target === "all" || target === "codex") printCodexTrustNotice();
   outro("Runlight local setup is ready. Run `runlight status` any time to check it.");
@@ -692,7 +712,7 @@ async function runSelfHostedClientSetup(opts = {}) {
   note("Self-hosted client", [`Server: ${serverUrl}`, `Daemon: http://127.0.0.1:${daemonPort}`]);
   const daemon = await startDaemon();
   const target = setupTargetFromOptions(opts);
-  if (target !== "skip") await installPlugin(target, {});
+  await installSetupPlugins(target);
   if (target === "all" || target === "codex") printCodexTrustNotice();
   outro("Runlight self-hosted client is ready.");
   return { serverUrl, daemon, plugins: target };
@@ -732,7 +752,7 @@ async function runSelfHostedServerSetup(opts = {}, { includeClient = false } = {
     });
     daemon = await startDaemon();
     target = setupTargetFromOptions(opts);
-    if (target !== "skip") await installPlugin(target, {});
+    await installSetupPlugins(target);
     if (target === "all" || target === "codex") printCodexTrustNotice();
   } else {
     await updateConfig({

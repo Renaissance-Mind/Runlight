@@ -270,6 +270,35 @@ export async function installAgentPlugin(agent, opts = {}) {
   return { agent: source, installed: true, ...(await installJsonHookPlugin(source, definition, opts)) };
 }
 
+function pluginFailureResult(agent, action, error) {
+  return {
+    agent,
+    [action === "uninstall" ? "uninstalled" : "installed"]: false,
+    error: {
+      message: error instanceof Error ? error.message : String(error),
+      ...(error && typeof error === "object" && "code" in error ? { code: error.code } : {}),
+      ...(error && typeof error === "object" && "path" in error ? { path: error.path } : {}),
+      ...(error && typeof error === "object" && "syscall" in error ? { syscall: error.syscall } : {}),
+    },
+  };
+}
+
+function commandForAllAgent(agent, command) {
+  return command?.replace(/\b(codex|claude)\b/g, agent);
+}
+
+export async function installAllAgentPlugins({ env = process.env, command } = {}) {
+  const results = {};
+  for (const agent of SUPPORTED_PLUGIN_TARGETS) {
+    try {
+      results[agent] = await installAgentPlugin(agent, { env, command: commandForAllAgent(agent, command) });
+    } catch (error) {
+      results[agent] = pluginFailureResult(agent, "install", error);
+    }
+  }
+  return results;
+}
+
 export async function uninstallAgentPlugin(agent, opts = {}) {
   const source = normalizeAgentSource(agent);
   if (source === "codex") return uninstallCodexPlugin(opts);
@@ -277,6 +306,18 @@ export async function uninstallAgentPlugin(agent, opts = {}) {
   const definition = AGENT_PLUGIN_DEFINITIONS[source];
   if (!definition) return { agent: source, uninstalled: false };
   return { agent: source, ...(await uninstallJsonHookPlugin(source, definition, opts)) };
+}
+
+export async function uninstallAllAgentPlugins({ env = process.env } = {}) {
+  const results = {};
+  for (const agent of SUPPORTED_PLUGIN_TARGETS) {
+    try {
+      results[agent] = await uninstallAgentPlugin(agent, { env });
+    } catch (error) {
+      results[agent] = pluginFailureResult(agent, "uninstall", error);
+    }
+  }
+  return results;
 }
 
 export async function pluginStatus({ env = process.env } = {}) {
