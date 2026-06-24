@@ -30,6 +30,10 @@ const CLAUDE_EVENTS = [
   ["PreCompact", 5, true],
 ];
 
+const KIMI_EVENTS = CLAUDE_EVENTS
+  .filter(([event]) => event !== "PermissionRequest")
+  .map(([event, timeout, asyncHook]) => [event, Math.min(timeout, 600), asyncHook]);
+
 const NESTED_EVENTS = [
   ["SessionStart", 5, false],
   ["SessionEnd", 5, true],
@@ -59,6 +63,10 @@ function homeDir(env) {
   return env.HOME || os.homedir();
 }
 
+function kimiCodeHome(env) {
+  return env.KIMI_CODE_HOME || path.join(homeDir(env), ".kimi-code");
+}
+
 const AGENT_PLUGIN_DEFINITIONS = {
   claude: { format: "claude", events: CLAUDE_EVENTS, configFile: (env) => env.CLAUDE_SETTINGS_FILE || path.join(homeDir(env), ".claude", "settings.json"), configKey: "hooks" },
   gemini: { format: "nested", events: NESTED_EVENTS, configFile: (env) => path.join(homeDir(env), ".gemini", "settings.json"), configKey: "hooks" },
@@ -76,7 +84,7 @@ const AGENT_PLUGIN_DEFINITIONS = {
   "google-antigravity": { format: "nested", events: NESTED_EVENTS, configFile: (env) => path.join(homeDir(env), ".gemini", "config", "hooks.json"), configKey: "codeisland" },
   workbuddy: { format: "claude", events: CLAUDE_EVENTS, configFile: (env) => path.join(homeDir(env), ".workbuddy", "settings.json"), configKey: "hooks" },
   qwen: { format: "claude", events: CLAUDE_EVENTS, configFile: (env) => path.join(homeDir(env), ".qwen", "settings.json"), configKey: "hooks" },
-  kimi: { format: "claude", events: CLAUDE_EVENTS.filter(([event]) => event !== "PermissionRequest"), configFile: (env) => path.join(homeDir(env), ".kimi", "settings.json"), configKey: "hooks" },
+  kimi: { format: "kimi-toml", events: KIMI_EVENTS, configFile: (env) => path.join(kimiCodeHome(env), "config.toml") },
 };
 
 function shellQuote(value) {
@@ -193,6 +201,246 @@ function hookEntryFor(format, agent, event, timeout, asyncHook, command) {
   return { hooks: [hook] };
 }
 
+function tomlString(value) {
+  return JSON.stringify(String(value));
+}
+
+function formatKimiHookEntry(entry) {
+  if (entry.raw) return entry.raw.trim();
+  const fields = [`event = ${tomlString(entry.event)}`];
+  if (entry.matcher !== undefined) fields.push(`matcher = ${tomlString(entry.matcher)}`);
+  fields.push(`command = ${tomlString(entry.command)}`);
+  if (entry.timeout !== undefined) fields.push(`timeout = ${Number(entry.timeout)}`);
+  return `{ ${fields.join(", ")} }`;
+}
+
+function formatKimiHooksToml(entries) {
+  if (entries.length === 0) return "hooks = []";
+  return `hooks = [\n${entries.map((entry) => `  ${formatKimiHookEntry(entry)}`).join(",\n")}\n]`;
+}
+
+function topLevelSectionStart(lines) {
+  const index = lines.findIndex((line) => /^\s*\[/.test(line));
+  return index === -1 ? lines.length : index;
+}
+
+function bracketDelta(line, state) {
+  let delta = 0;
+  let escaped = false;
+  for (const char of line) {
+    if (state.inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === state.inString) {
+        state.inString = "";
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      state.inString = char;
+      continue;
+    }
+    if (char === "#") break;
+    if (char === "[") delta += 1;
+    if (char === "]") delta -= 1;
+  }
+  return delta;
+}
+
+function findTopLevelHooksArray(input) {
+  const text = String(input || "");
+  const lines = text.split(/\r?\n/);
+  const sectionStart = topLevelSectionStart(lines);
+  for (let i = 0; i < sectionStart; i += 1) {
+    if (!/^\s*hooks\s*=/.test(lines[i])) continue;
+    const collected = [lines[i]];
+    const state = { inString: "" };
+    let depth = bracketDelta(lines[i], state);
+    let end = i + 1;
+    while (depth > 0 && end < lines.length) {
+      collected.push(lines[end]);
+      depth += bracketDelta(lines[end], state);
+      end += 1;
+    }
+    if (depth !== 0) throw new Error("Kimi config has an unterminated top-level hooks array.");
+    return { start: i, end, text: collected.join("\n") };
+  }
+  return null;
+}
+
+function splitTomlInlineTables(arrayText) {
+  const start = arrayText.indexOf("[");
+  const end = arrayText.lastIndexOf("]");
+  if (start === -1 || end === -1 || end < start) throw new Error("Kimi hooks must be a TOML array.");
+  const body = arrayText.slice(start + 1, end);
+  const tables = [];
+  let current = "";
+  let depth = 0;
+  let inString = "";
+  let escaped = false;
+
+  for (const char of body) {
+    if (inString) {
+      current += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === inString) {
+        inString = "";
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      inString = char;
+      current += char;
+      continue;
+    }
+    if (char === "{") {
+      depth += 1;
+      current += char;
+      continue;
+    }
+    if (char === "}") {
+      depth -= 1;
+      current += char;
+      if (depth === 0) {
+        tables.push(current.trim());
+        current = "";
+      }
+      continue;
+    }
+    if (depth > 0) current += char;
+  }
+
+  if (depth !== 0 || inString) throw new Error("Kimi hooks contains an incomplete inline table.");
+  const trailing = current.replace(/[,\s]/g, "");
+  if (trailing.length > 0) throw new Error("Kimi hooks must use inline table entries.");
+  return tables;
+}
+
+function splitTomlInlineFields(tableText) {
+  const inner = tableText.trim().replace(/^\{/, "").replace(/\}$/, "");
+  const fields = [];
+  let current = "";
+  let inString = "";
+  let escaped = false;
+
+  for (const char of inner) {
+    if (inString) {
+      current += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === inString) {
+        inString = "";
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      inString = char;
+      current += char;
+      continue;
+    }
+    if (char === ",") {
+      if (current.trim()) fields.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) fields.push(current.trim());
+  return fields;
+}
+
+function parseTomlValue(value) {
+  const text = value.trim();
+  if (/^".*"$/.test(text)) return JSON.parse(text);
+  if (/^'.*'$/.test(text)) return text.slice(1, -1);
+  if (/^\d+$/.test(text)) return Number(text);
+  if (text === "true") return true;
+  if (text === "false") return false;
+  return text;
+}
+
+function parseKimiHooksToml(arrayText) {
+  return splitTomlInlineTables(arrayText).map((raw) => {
+    const parsed = { raw };
+    for (const field of splitTomlInlineFields(raw)) {
+      const separator = field.indexOf("=");
+      if (separator === -1) continue;
+      parsed[field.slice(0, separator).trim()] = parseTomlValue(field.slice(separator + 1));
+    }
+    return parsed;
+  });
+}
+
+function insertOrReplaceTopLevelHooksToml(input, entries) {
+  const text = String(input || "");
+  const replacement = formatKimiHooksToml(entries);
+  if (text.trim() === "") return `${replacement}\n`;
+  const range = findTopLevelHooksArray(text);
+  const lines = text.split(/\r?\n/);
+  if (range) {
+    lines.splice(range.start, range.end - range.start, replacement);
+    return `${lines.join("\n").replace(/\n*$/, "")}\n`;
+  }
+
+  const insertAt = topLevelSectionStart(lines);
+  const before = lines.slice(0, insertAt);
+  const after = lines.slice(insertAt);
+  if (before.length > 0 && before[before.length - 1].trim() !== "") before.push("");
+  before.push(replacement);
+  if (after.length > 0 && after[0].trim() !== "") before.push("");
+  return `${before.concat(after).join("\n").replace(/\n*$/, "")}\n`;
+}
+
+function upsertKimiRunlightHooksToml(input, agent, definition, command) {
+  const range = findTopLevelHooksArray(input);
+  const existing = range ? parseKimiHooksToml(range.text).filter((entry) => !isRunlightHookCommand(entry.command, agent)) : [];
+  const runlightEntries = definition.events.map(([event, timeout]) => ({
+    event,
+    command: commandFor(agent, command),
+    timeout,
+  }));
+  return insertOrReplaceTopLevelHooksToml(input, [...existing, ...runlightEntries]);
+}
+
+function removeKimiRunlightHooksToml(input, agent) {
+  const range = findTopLevelHooksArray(input);
+  if (!range) return String(input || "");
+  const existing = parseKimiHooksToml(range.text).filter((entry) => !isRunlightHookCommand(entry.command, agent));
+  return insertOrReplaceTopLevelHooksToml(input, existing);
+}
+
+async function installKimiTomlHookPlugin(agent, definition, { env = process.env, command } = {}) {
+  const configFile = definition.configFile(env);
+  const before = await readTextFile(configFile);
+  const after = upsertKimiRunlightHooksToml(before, agent, definition, command);
+  await fs.mkdir(path.dirname(configFile), { recursive: true });
+  await fs.writeFile(configFile, after);
+  return { configFile, events: definition.events.map(([event]) => event), command: commandFor(agent, command) };
+}
+
+async function uninstallKimiTomlHookPlugin(agent, definition, { env = process.env } = {}) {
+  const configFile = definition.configFile(env);
+  const before = await readTextFile(configFile);
+  const after = removeKimiRunlightHooksToml(before, agent);
+  await fs.mkdir(path.dirname(configFile), { recursive: true });
+  await fs.writeFile(configFile, after);
+  return { configFile };
+}
+
+async function isKimiTomlHookInstalled(agent, definition, { env = process.env } = {}) {
+  const configFile = definition.configFile(env);
+  const text = await readTextFile(configFile);
+  const range = findTopLevelHooksArray(text);
+  return Boolean(range && isRunlightHookCommand(range.text, agent));
+}
+
 async function installJsonHookPlugin(agent, definition, { env = process.env, command } = {}) {
   const configFile = definition.configFile(env);
   const config = await readJsonFile(configFile, {});
@@ -267,6 +515,7 @@ export async function installAgentPlugin(agent, opts = {}) {
       reason: "This agent needs a provider-specific extension hook; Runlight can ingest its events when configured to call `runlight hook`.",
     };
   }
+  if (definition.format === "kimi-toml") return { agent: source, installed: true, ...(await installKimiTomlHookPlugin(source, definition, opts)) };
   return { agent: source, installed: true, ...(await installJsonHookPlugin(source, definition, opts)) };
 }
 
@@ -305,6 +554,7 @@ export async function uninstallAgentPlugin(agent, opts = {}) {
   if (source === "claude") return uninstallClaudePlugin(opts);
   const definition = AGENT_PLUGIN_DEFINITIONS[source];
   if (!definition) return { agent: source, uninstalled: false };
+  if (definition.format === "kimi-toml") return { agent: source, ...(await uninstallKimiTomlHookPlugin(source, definition, opts)) };
   return { agent: source, ...(await uninstallJsonHookPlugin(source, definition, opts)) };
 }
 
@@ -338,6 +588,10 @@ export async function pluginStatus({ env = process.env } = {}) {
       continue;
     }
     const configFile = definition.configFile(env);
+    if (definition.format === "kimi-toml") {
+      status[agent] = { installed: await isKimiTomlHookInstalled(agent, definition, { env }), configFile };
+      continue;
+    }
     const config = await readJsonFile(configFile, {});
     const hooks = definition.configKey ? config[definition.configKey] : config.hooks;
     const installed = Object.values(hooks || {}).some((entries) =>

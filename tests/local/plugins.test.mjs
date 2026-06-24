@@ -11,6 +11,7 @@ import {
   installCodexPlugin,
   pluginStatus,
   SUPPORTED_PLUGIN_TARGETS,
+  uninstallAgentPlugin,
   uninstallClaudePlugin,
   uninstallCodexPlugin,
 } from "../../src/local/plugins.js";
@@ -112,6 +113,37 @@ describe("local plugin installers", () => {
     assert.equal(settings.hooks.SessionStart[0].hooks[0].command, "runlight hook qwen");
     assert.equal(settings.hooks.PermissionRequest[0].hooks[0].timeout, 86400);
     assert.equal(settings.hooks.PermissionRequest[0].hooks[0].async, false);
+  });
+
+  it("installs Kimi hooks in config.toml", async () => {
+    const home = await tempDir("runlight-kimi-home-");
+    const env = { ...process.env, HOME: home };
+    const configFile = path.join(home, ".kimi-code", "config.toml");
+    await fs.mkdir(path.dirname(configFile), { recursive: true });
+    await fs.writeFile(
+      configFile,
+      'default_provider = "moonshot"\n\nhooks = [\n  { event = "SessionStart", command = "existing hook", timeout = 5 }\n]\n\n[permission]\n',
+    );
+
+    const result = await installAgentPlugin("kimi", { env, command: "runlight hook kimi" });
+    const config = await fs.readFile(result.configFile, "utf8");
+
+    assert.equal(result.configFile, configFile);
+    assert.match(config, /default_provider = "moonshot"/);
+    assert.match(config, /\[permission]/);
+    assert.match(config, /command = "existing hook"/);
+    assert.match(config, /event = "SessionStart", command = "runlight hook kimi", timeout = 5/);
+    assert.match(config, /event = "Notification", command = "runlight hook kimi", timeout = 600/);
+    assert.doesNotMatch(config, /PermissionRequest/);
+
+    const status = await pluginStatus({ env });
+    assert.equal(status.kimi.installed, true);
+    assert.equal(status.kimi.configFile, configFile);
+
+    await uninstallAgentPlugin("kimi", { env });
+    const after = await fs.readFile(configFile, "utf8");
+    assert.match(after, /command = "existing hook"/);
+    assert.doesNotMatch(after, /runlight hook kimi/);
   });
 
   it("keeps installing all hooks when one agent config path fails", async () => {

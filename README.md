@@ -273,6 +273,19 @@ agent after the user decides. Hosted Runlight APIs remain an observability
 surface; approval decisions are served by the local daemon on the machine that
 is running the hook.
 
+### Kimi Code
+
+Install Kimi Code hooks through the npm CLI:
+
+```bash
+runlight plugin kimi
+```
+
+The installer writes hook entries to `$KIMI_CODE_HOME/config.toml` or
+`~/.kimi-code/config.toml`, which is the user-level configuration read by Kimi
+Code. Legacy `~/.kimi/settings.json` files are not used by current Kimi Code
+hook loading.
+
 ### Additional Agents
 
 Runlight's hook registry recognizes the same built-in source vocabulary across
