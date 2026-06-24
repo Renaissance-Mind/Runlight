@@ -1,6 +1,6 @@
 {
   "name": "runlight",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Local daemon and CLI for forwarding agent lifecycle events to Runlight.",
   "type": "module",
   "bin": {

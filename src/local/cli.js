@@ -29,6 +29,7 @@ import {
 import { postHookInput, readStdin } from "./hook.js";
 import { isSupportedAgentSource, normalizeAgentSource } from "./agent-registry.js";
 import { confirm, intro, note, openUrl, outro, promptSecret, promptText, select } from "./prompts.js";
+import { packageSpecFromOptions, runUpgradePlan } from "./upgrade.js";
 import {
   buildLocalConfigPatch,
   buildSelfHostedClientConfigPatch,
@@ -46,6 +47,7 @@ Usage:
   runlight setup --self-hosted [--role <server|client|both>]
   runlight login [--server <url>] [--token <token>]
   runlight logout [--json] [--keep-hooks] [--keep-daemon]
+  runlight upgrade [--version <version>] [--no-plugins] [--no-daemon-restart]
   runlight status [--json]
   runlight health [--json]
   runlight setting
@@ -92,6 +94,12 @@ function parseArgs(argv) {
 
 function printJson(value) {
   console.log(JSON.stringify(value, null, 2));
+}
+
+async function runVersion() {
+  const pkg = JSON.parse(await fs.readFile(new URL("../../package.json", import.meta.url), "utf8"));
+  console.log(pkg.version);
+  return pkg.version;
 }
 
 function localIPv4() {
@@ -398,6 +406,46 @@ async function runPlugin(positional, opts) {
   const target = positional[1] || "all";
   const result = opts.uninstall ? await uninstallPlugin(target) : await installPlugin(target, opts);
   printJson(result);
+  return result;
+}
+
+async function restartDaemonForUpgrade() {
+  const stopped = await stopDaemonIfRunning();
+  const started = await startDaemon();
+  return { stopped, started };
+}
+
+async function runUpgrade(opts) {
+  const target = setupTargetFromOptions(opts);
+  const packageSpec = packageSpecFromOptions(opts);
+  if (!opts.json) {
+    intro("Runlight Upgrade");
+    note("Package", [
+      `Installing ${packageSpec} globally.`,
+      target === "skip" ? "Agent hooks will not be changed." : `Agent hooks will be refreshed: ${target}.`,
+      opts.noDaemonRestart || opts.noRestart ? "Daemon restart disabled." : "Local daemon will restart after the package upgrade.",
+    ]);
+  }
+
+  const result = await runUpgradePlan(
+    { ...opts, plugins: target },
+    {
+      installHooks: (plugins) => installPlugin(plugins, {}),
+      restartDaemon: restartDaemonForUpgrade,
+    },
+  );
+
+  if (opts.json) {
+    printJson(result);
+    return result;
+  }
+
+  note("Upgrade result", [
+    result.install.skipped ? `Dry run: ${result.install.command} ${result.install.args.join(" ")}` : "Package upgrade completed.",
+    result.hooks.skipped ? "Agent hooks were skipped." : "Agent hooks refreshed.",
+    result.daemon.skipped ? "Daemon restart skipped." : "Daemon restarted.",
+  ]);
+  outro("Run `runlight --version` to confirm the installed version.");
   return result;
 }
 
@@ -718,6 +766,7 @@ async function runHook(positional) {
 export async function main(argv) {
   const { positional, opts } = parseArgs(argv);
   const command = positional[0];
+  if (command === "version" || (!command && opts.version)) return runVersion();
   if (!command || command === "help" || opts.help) {
     printHelp();
     return;
@@ -725,6 +774,7 @@ export async function main(argv) {
   if (command === "setup" || command === "install" || command === "onboarding" || command === "onboard") return runSetup(opts);
   if (command === "login") return runLogin(opts);
   if (command === "logout") return runLogout(opts);
+  if (command === "upgrade") return runUpgrade(opts);
   if (command === "status") return runStatus(opts);
   if (command === "health") return runHealth(opts);
   if (command === "setting" || command === "settings") return runSetting(positional);

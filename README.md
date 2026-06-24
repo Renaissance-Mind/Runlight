@@ -129,6 +129,21 @@ From a source checkout, use:
 npm install -g .
 ```
 
+To upgrade an existing npm install before `runlight upgrade` is available:
+
+```bash
+npm install -g runlight@latest
+runlight --version
+runlight plugin all
+runlight daemon restart
+```
+
+Newer versions can upgrade themselves:
+
+```bash
+runlight upgrade
+```
+
 ### 2. Set up this machine
 
 ```bash
@@ -446,6 +461,7 @@ Useful local commands:
 runlight setup
 runlight login
 runlight logout
+runlight upgrade
 runlight setting
 runlight status
 runlight health

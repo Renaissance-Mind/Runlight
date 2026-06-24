@@ -96,6 +96,20 @@ npm install -g runlight
 runlight setup
 ```
 
+Upgrade existing machines with:
+
+```bash
+runlight upgrade
+```
+
+If the installed CLI is too old to have `runlight upgrade`, use:
+
+```bash
+npm install -g runlight@latest
+runlight plugin all
+runlight daemon restart
+```
+
 Use `runlight setting` for interactive configuration and `runlight status` or
 `runlight health` to verify the local queue, daemon, server, and plugin state.
 Local settings live in `~/.runlight/config.json` unless `RUNLIGHT_HOME` is set.
